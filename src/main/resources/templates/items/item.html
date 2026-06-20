@@ -1,0 +1,41 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <title>상품 상세</title>
+    <link th:href="@{/css/bootstrap.min.css}" href="../css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container" style="max-width: 700px">
+    <div class="py-5 text-center">
+        <h2>상품 상세</h2>
+    </div>
+
+    <!-- TODO: Controller에서 "item"을 Model에 담고 th:text로 값 출력하기 -->
+    <div class="mb-3">
+        <label class="form-label">상품명</label>
+        <div class="form-control">예시 상품명</div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">설명</label>
+        <div class="form-control">예시 설명</div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">가격</label>
+        <div class="form-control">10000</div>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">상태</label>
+        <div class="form-control">SELLING</div>
+    </div>
+
+    <a href="/items" class="btn btn-secondary">목록</a>
+    <a href="/items/1/edit" class="btn btn-primary">수정</a>
+
+    <!-- TODO: th:action으로 현재 item.id를 사용해 삭제 URL 만들기 -->
+    <form action="/items/1/delete" method="post" style="display: inline">
+        <button type="submit" class="btn btn-danger">삭제</button>
+    </form>
+</div>
+</body>
+</html>

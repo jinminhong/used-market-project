@@ -1,0 +1,23 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <title>요청 오류</title>
+    <link th:href="@{/css/bootstrap.min.css}" href="../css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container" style="max-width: 700px">
+    <div class="py-5 text-center">
+        <h2>요청을 처리할 수 없습니다</h2>
+    </div>
+
+    <!-- TODO: status, error, message, path 값을 th:text로 출력해보기 -->
+    <div class="alert alert-warning">
+        <p class="mb-1">4xx Client Error</p>
+        <p class="mb-0">잘못된 요청이거나 접근할 수 없는 페이지입니다.</p>
+    </div>
+
+    <a href="/" class="btn btn-primary">홈으로</a>
+</div>
+</body>
+</html>

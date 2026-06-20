@@ -1,0 +1,29 @@
+package com.side.project.web;
+
+import com.side.project.web.interceptor.LoginCheckInterceptor;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(new LoginCheckInterceptor())
+                .order(1)
+                .addPathPatterns("/**")
+                .excludePathPatterns(
+                        "/",
+                        "/login",
+                        "/logout",
+                        "/members/add",
+                        "/css/**",
+                        "/error"
+                );
+
+        // TODO:
+        // Add or remove paths while studying which pages require login.
+        // Example: allow /items for everyone, but require login for /items/add.
+    }
+}

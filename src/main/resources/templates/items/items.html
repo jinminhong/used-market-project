@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <title>상품 목록</title>
+    <link th:href="@{/css/bootstrap.min.css}" href="../css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<div class="container">
+    <div class="py-5 text-center">
+        <h2>상품 목록</h2>
+    </div>
+
+    <div class="mb-3">
+        <a href="/items/add" class="btn btn-primary">상품 등록</a>
+        <a href="/" class="btn btn-secondary">홈</a>
+    </div>
+
+    <!-- TODO: Controller에서 "items"를 Model에 담고 th:each로 반복 출력하기 -->
+    <table class="table">
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>상품명</th>
+            <th>가격</th>
+            <th>상태</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>예시 ID</td>
+            <td><a href="/items/1">예시 상품명</a></td>
+            <td>예시 가격</td>
+            <td>SELLING</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>
