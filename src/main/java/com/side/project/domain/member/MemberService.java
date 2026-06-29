@@ -17,12 +17,20 @@ public class MemberService {
 
     @Transactional
     public Long join(MemberSaveForm memberForm) {
+        checkDuplicate(memberForm);
+        Member member = new Member(memberForm.getLoginId(),memberForm.getName(),memberForm.getPassword(), memberForm.getNickname());
+        return memberRepository.save(member).getId();
+    }
+
+    private void checkDuplicate(MemberSaveForm memberForm) {
         memberRepository.findByLoginId(memberForm.getLoginId())
                 .ifPresent(existing -> {
                     throw new DuplicateMemberException("이미 사용 중인 로그인 ID입니다.");
                 });
-        Member member = new Member(memberForm.getLoginId(),memberForm.getName(),memberForm.getPassword(), memberForm.getNickname());
-        return memberRepository.save(member).getId();
+        memberRepository.findByNickName(memberForm.getNickname())
+                .ifPresent(existing -> {
+                    throw new DuplicateMemberException("이미 사용 중인 닉네임입니다.");
+                });
     }
 
     public Optional<Member> findById(Long memberId) {

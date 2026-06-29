@@ -17,6 +17,7 @@ public class Member {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "members_id")
     private Long id;
 
     @Column(nullable = false, unique = true, length = 50)
@@ -31,7 +32,7 @@ public class Member {
     @Column(nullable = false, length = 100)
     private String password;
 
-    @OneToMany(mappedBy = "seller")
+    @OneToMany(mappedBy = "member")
     private List<Item> itemList = new ArrayList<>();
 
     public Member(String loginId, String name, String password , String nickName) {

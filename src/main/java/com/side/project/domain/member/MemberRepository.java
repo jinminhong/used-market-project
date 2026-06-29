@@ -9,5 +9,5 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     // 예: findByLoginId -> select m from Member m where m.loginId = ?
     Optional<Member> findByLoginId(String loginId);
 
-    Member save(Member member);
+    Optional<Member> findByNickName(String nickname);
 }

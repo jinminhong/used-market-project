@@ -1,286 +1,221 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 
-const API_BASE_URL = "/api";
+const CATEGORIES = ["All", "Outer", "Top", "Bag", "Shoes", "Accessory"];
+const STATUSES = ["SELLING", "RESERVED", "SOLD"];
 
 const sampleItems = [
-  {
-    id: 1,
-    title: "MacBook Pro 14",
-    description: "Good condition, normal operation.",
-    price: 1200000,
-    status: "SELLING",
-    sellerId: 1,
-  },
-  {
-    id: 2,
-    title: "Wireless Keyboard",
-    description: "Almost new, box included.",
-    price: 45000,
-    status: "RESERVED",
-    sellerId: 1,
-  },
+  { itemId: 1, name: "Archive Leather Jacket", description: "부드러운 양가죽 소재의 빈티지 재킷입니다. 자연스러운 사용감이 있고 전체적인 컨디션은 좋습니다.", price: 182000, status: "SELLING", nickName: "hong", category: "Outer", imageUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 2, name: "Washed Cotton Shirt", description: "워싱감이 예쁜 코튼 셔츠입니다. 단품이나 이너로 활용하기 좋습니다.", price: 46000, status: "RESERVED", nickName: "lee", category: "Top", imageUrl: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 3, name: "Minimal Cross Bag", description: "데일리로 들기 좋은 크로스백입니다. 내부 수납 깨끗합니다.", price: 69000, status: "SELLING", nickName: "hong", category: "Bag", imageUrl: "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 4, name: "Suede Loafers", description: "스웨이드 로퍼 260 사이즈입니다. 밑창 마모 적습니다.", price: 88000, status: "SOLD", nickName: "mori", category: "Shoes", imageUrl: "https://images.unsplash.com/photo-1614252369475-531eba835eb1?auto=format&fit=crop&w=900&q=80" },
 ];
 
-function createItemApi({ useMock, setLastRequest }) {
+function defaultImage() {
+  return "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=80";
+}
+
+function normalizeItem(item, fallbackId) {
+  return {
+    itemId: item.itemId ?? item.id ?? fallbackId ?? null,
+    name: item.name ?? item.title ?? "이름 없는 상품",
+    description: item.description ?? "",
+    price: Number(item.price ?? 0),
+    status: item.status ?? "SELLING",
+    nickName: item.nickName ?? item.nickname ?? "seller",
+    category: item.category ?? "All",
+    imageUrl: item.imageUrl || defaultImage(),
+  };
+}
+
+function createApi(useMock) {
   let mockItems = [...sampleItems];
+  let mockMember = null;
 
   async function request(path, options = {}) {
     const method = options.method || "GET";
     const body = options.body ? JSON.parse(options.body) : null;
-    const url = `${API_BASE_URL}${path}`;
 
-    setLastRequest({ method, url, body });
+    if (useMock) return mockRequest(path, method, body);
 
-    if (useMock) {
-      return mockRequest(path, method, body);
-    }
-
-    const response = await fetch(url, {
-      headers: {
-        "Content-Type": "application/json",
-        ...options.headers,
-      },
+    const response = await fetch(path, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json", ...options.headers },
       ...options,
     });
-
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({
-        message: "API request failed.",
-      }));
-      throw new Error(errorBody.message || "API request failed.");
-    }
-
-    if (response.status === 204) {
-      return null;
-    }
-
-    return response.json();
+    if (!response.ok) throw new Error((await response.text()) || `요청 실패 (${response.status})`);
+    if (response.status === 204) return null;
+    const text = await response.text();
+    if (!text) return null;
+    try { return JSON.parse(text); } catch { return text; }
   }
 
   async function mockRequest(path, method, body) {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-
-    if (path === "/items" && method === "GET") {
-      return { items: mockItems, total: mockItems.length };
+    await new Promise((resolve) => setTimeout(resolve, 140));
+    if (path === "/login" && method === "POST") {
+      mockMember = { memberId: body.loginId === "lee" ? 2 : 1, loginId: body.loginId, nickName: body.loginId === "lee" ? "lee" : "hong" };
+      return mockMember;
     }
-
+    if (path === "/members/add" && method === "POST") return body;
+    if (path === "/items" && method === "GET") return mockItems;
     if (path === "/items" && method === "POST") {
-      const item = {
-        id: Date.now(),
-        title: body.title,
-        description: body.description,
-        price: Number(body.price),
-        status: "SELLING",
-        sellerId: Number(body.sellerId),
-      };
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      const item = { ...body, itemId: Date.now(), price: Number(body.price), status: "SELLING", nickName: mockMember.nickName, imageUrl: body.imageUrl || defaultImage() };
       mockItems = [item, ...mockItems];
       return item;
     }
-
-    const itemId = Number(path.replace("/items/", ""));
-
+    const itemId = Number(path.match(/\/items\/(\d+)/)?.[1]);
+    if (path.startsWith("/items/") && method === "GET") return mockItems.find((item) => item.itemId === itemId) ?? null;
     if (path.startsWith("/items/") && method === "PATCH") {
-      mockItems = mockItems.map((item) =>
-        item.id === itemId ? { ...item, ...body, price: Number(body.price) } : item
-      );
-      return mockItems.find((item) => item.id === itemId);
+      mockItems = mockItems.map((item) => item.itemId === itemId ? { ...item, ...body, price: Number(body.price) } : item);
+      return mockItems.find((item) => item.itemId === itemId);
     }
-
-    if (path.startsWith("/items/") && method === "DELETE") {
-      mockItems = mockItems.filter((item) => item.id !== itemId);
+    if (path.endsWith("/delete") && method === "POST") {
+      mockItems = mockItems.filter((item) => item.itemId !== itemId);
       return null;
     }
-
-    throw new Error("Mock API route is not defined.");
+    throw new Error("정의되지 않은 요청입니다.");
   }
 
   return {
+    login: (data) => request("/login", { method: "POST", body: JSON.stringify(data) }),
+    signup: (data) => request("/members/add", { method: "POST", body: JSON.stringify(data) }),
     listItems: () => request("/items"),
-    createItem: (data) =>
-      request("/items", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
-    updateItem: (id, data) =>
-      request(`/items/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }),
-    deleteItem: (id) =>
-      request(`/items/${id}`, {
-        method: "DELETE",
-      }),
+    findItem: (id) => request(`/items/${id}`),
+    createItem: (data) => request("/items", { method: "POST", body: JSON.stringify(data) }),
+    updateItem: (id, data) => request(`/items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+    deleteItem: (id) => request(`/items/${id}/delete`, { method: "POST" }),
   };
 }
 
-export default function App() {
-  const [useMock, setUseMock] = useState(true);
-  const [items, setItems] = useState([]);
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    price: "",
-    sellerId: 1,
-  });
-  const [lastRequest, setLastRequest] = useState(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const api = useMemo(
-    () => createItemApi({ useMock, setLastRequest }),
-    [useMock]
+function Nav({ member, useMock, setUseMock, go, logout }) {
+  return (
+    <header className="site-header">
+      <button className="brand" type="button" onClick={() => go("home")}>Fruits Market</button>
+      <nav className="nav-links">
+        <button type="button" onClick={() => go("home")}>Shop</button>
+        <button type="button" onClick={() => go("new")}>Sell</button>
+      </nav>
+      <div className="nav-actions">
+        <label className="mock-toggle"><input type="checkbox" checked={useMock} onChange={(event) => setUseMock(event.target.checked)} /> Mock</label>
+        {member ? <><span className="member-chip">@{member.nickName}</span><button type="button" onClick={logout}>Logout</button></> : <button type="button" onClick={() => go("auth")}>Login</button>}
+      </div>
+    </header>
   );
+}
 
-  async function run(action) {
-    setLoading(true);
-    setError("");
-    try {
-      await action();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function loadItems() {
-    await run(async () => {
-      const data = await api.listItems();
-      setItems(data.items);
-    });
-  }
-
-  async function submitItem(event) {
-    event.preventDefault();
-
-    if (!form.title.trim() || !form.price) {
-      setError("Title and price are required.");
-      return;
-    }
-
-    await run(async () => {
-      const created = await api.createItem(form);
-      setItems((current) => [created, ...current]);
-      setForm({ title: "", description: "", price: "", sellerId: 1 });
-    });
-  }
-
-  async function toggleReserved(item) {
-    await run(async () => {
-      const updated = await api.updateItem(item.id, {
-        title: item.title,
-        description: item.description,
-        price: item.price,
-        status: item.status === "RESERVED" ? "SELLING" : "RESERVED",
-      });
-      setItems((current) =>
-        current.map((target) => (target.id === updated.id ? updated : target))
-      );
-    });
-  }
-
-  async function deleteItem(itemId) {
-    await run(async () => {
-      await api.deleteItem(itemId);
-      setItems((current) => current.filter((item) => item.id !== itemId));
-    });
-  }
-
-  function changeForm(event) {
-    const { name, value } = event.target;
-    setForm((current) => ({ ...current, [name]: value }));
-  }
-
-  useEffect(() => {
-    loadItems();
-  }, [api]);
+function Home({ items, category, search, setCategory, setSearch, openItem }) {
+  const visibleItems = items.filter((item) => {
+    const keyword = search.trim().toLowerCase();
+    return (category === "All" || item.category === category) && (!keyword || `${item.name} ${item.description} ${item.nickName}`.toLowerCase().includes(keyword));
+  });
 
   return (
-    <main className="page">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Used Market</p>
-          <h1>React REST API Frontend</h1>
-        </div>
+    <main className="page-shell">
+      <section className="hero-strip"><div><p>Latest vintage drops</p><h1>개성 있는 셀러들의 상품을 둘러보세요</h1></div><div className="hero-count"><strong>{items.length}</strong><span>items</span></div></section>
+      <section className="shop-toolbar">
+        <div className="category-tabs">{CATEGORIES.map((name) => <button key={name} type="button" className={category === name ? "active" : ""} onClick={() => setCategory(name)}>{name}</button>)}</div>
+        <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="상품, 설명, 셀러 검색" />
+      </section>
+      <section className="product-grid">
+        {visibleItems.map((item, index) => <button className="product-card" type="button" key={`${item.itemId ?? item.name}-${index}`} onClick={() => openItem(item)}><span className="product-image-wrap"><img src={item.imageUrl} alt="" /><span className={`status-pill ${item.status.toLowerCase()}`}>{item.status}</span></span><span className="product-info"><strong>{item.name}</strong><span>{item.price.toLocaleString()}원</span><em>@{item.nickName}</em></span></button>)}
+      </section>
+      {visibleItems.length === 0 && <p className="quiet-message">조건에 맞는 상품이 없습니다.</p>}
+    </main>
+  );
+}
 
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={useMock}
-            onChange={(event) => setUseMock(event.target.checked)}
-          />
-          Mock API
-        </label>
-      </header>
+function Detail({ item, member, go, edit, remove, loading }) {
+  if (!item) return <main className="page-shell narrow-page"><button className="text-button" type="button" onClick={() => go("home")}>Back to shop</button><p className="quiet-message">상품을 찾을 수 없습니다.</p></main>;
+  const isOwner = member?.nickName === item.nickName;
+  const canMutate = isOwner && item.itemId;
 
-      <section className="layout">
-        <div className="main-panel">
-          <form className="item-form" onSubmit={submitItem}>
-            <input
-              name="title"
-              value={form.title}
-              onChange={changeForm}
-              placeholder="Item title"
-            />
-            <input
-              name="price"
-              type="number"
-              value={form.price}
-              onChange={changeForm}
-              placeholder="Price"
-            />
-            <textarea
-              name="description"
-              value={form.description}
-              onChange={changeForm}
-              placeholder="Description"
-            />
-            <button disabled={loading}>Create Item</button>
-          </form>
-
-          {error && <p className="error">{error}</p>}
-
-          <ul className="items">
-            {items.map((item) => (
-              <li key={item.id}>
-                <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.description}</p>
-                  <span>{item.price.toLocaleString()} KRW</span>
-                </div>
-
-                <div className="actions">
-                  <span className={`badge ${item.status.toLowerCase()}`}>
-                    {item.status}
-                  </span>
-                  <button type="button" onClick={() => toggleReserved(item)}>
-                    Toggle Reserved
-                  </button>
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={() => deleteItem(item.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <aside className="api-panel">
-          <h2>Last API Request</h2>
-          {lastRequest ? (
-            <pre>{JSON.stringify(lastRequest, null, 2)}</pre>
-          ) : (
-            <p>No request yet.</p>
-          )}
-
-          <h2>Development Proxy</h2>
-          <code>React 5173 /api -&gt; Spring 8080 /api</code>
+  return (
+    <main className="detail-page">
+      <button className="text-button" type="button" onClick={() => go("home")}>Back to shop</button>
+      <section className="detail-layout">
+        <div className="detail-image"><img src={item.imageUrl} alt="" /></div>
+        <aside className="detail-info">
+          <div className="seller-line"><span>@{item.nickName}</span><span className={`status-pill ${item.status.toLowerCase()}`}>{item.status}</span></div>
+          <h1>{item.name}</h1><strong className="detail-price">{item.price.toLocaleString()}원</strong><p>{item.description || "등록된 설명이 없습니다."}</p>
+          {isOwner ? <div className="owner-actions"><button type="button" onClick={edit} disabled={!canMutate || loading}>수정하기</button><button className="danger" type="button" onClick={remove} disabled={!canMutate || loading}>삭제하기</button>{!item.itemId && <small>현재 목록 응답에 상품 ID가 없어 실제 수정/삭제 요청은 보낼 수 없습니다.</small>}</div> : <div className="buyer-actions"><button type="button" onClick={() => !member && go("auth")}>{member ? "구매 문의" : "로그인하고 문의하기"}</button></div>}
         </aside>
       </section>
     </main>
   );
+}
+
+function Auth({ mode, setMode, form, change, submit, loading }) {
+  return <main className="form-page"><section className="form-panel"><p>{mode === "login" ? "Welcome back" : "Create account"}</p><h1>{mode === "login" ? "로그인" : "회원가입"}</h1><form onSubmit={submit}><input name="loginId" value={form.loginId} onChange={change} placeholder="로그인 ID" /><input name="password" type="password" value={form.password} onChange={change} placeholder="비밀번호" />{mode === "signup" && <><input name="name" value={form.name} onChange={change} placeholder="이름" /><input name="nickname" value={form.nickname} onChange={change} placeholder="닉네임" /></>}<button disabled={loading}>{mode === "login" ? "로그인" : "가입하기"}</button></form><button className="text-button" type="button" onClick={() => setMode(mode === "login" ? "signup" : "login")}>{mode === "login" ? "계정 만들기" : "이미 계정이 있어요"}</button></section></main>;
+}
+
+function Editor({ title, form, change, submit, cancel, loading }) {
+  return <main className="form-page"><section className="form-panel wide-panel"><p>Seller studio</p><h1>{title}</h1><form onSubmit={submit}><input name="name" value={form.name} onChange={change} placeholder="상품명" /><div className="split-fields"><input name="price" type="number" min="0" value={form.price} onChange={change} placeholder="가격" /><select name="category" value={form.category} onChange={change}>{CATEGORIES.map((name) => <option key={name} value={name}>{name}</option>)}</select></div><input name="imageUrl" value={form.imageUrl} onChange={change} placeholder="이미지 URL" /><textarea name="description" value={form.description} onChange={change} placeholder="상품 설명" /><div className="split-fields"><select name="status" value={form.status} onChange={change}>{STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select><button disabled={loading}>저장</button></div></form><button className="text-button" type="button" onClick={cancel}>취소</button></section></main>;
+}
+
+export default function App() {
+  const [useMock, setUseMock] = useState(true);
+  const [route, setRoute] = useState("home");
+  const [items, setItems] = useState([]);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [member, setMember] = useState(null);
+  const [category, setCategory] = useState("All");
+  const [search, setSearch] = useState("");
+  const [authMode, setAuthMode] = useState("login");
+  const [authForm, setAuthForm] = useState({ loginId: "asd", name: "", password: "1234", nickname: "" });
+  const [itemForm, setItemForm] = useState({ name: "", description: "", price: "", status: "SELLING", category: "All", imageUrl: "" });
+  const [notice, setNotice] = useState("");
+  const [loading, setLoading] = useState(false);
+  const api = useMemo(() => createApi(useMock), [useMock]);
+
+  function go(next) {
+    setNotice("");
+    if (next === "new" && !member) { setNotice("상품을 등록하려면 로그인해주세요."); setRoute("auth"); return; }
+    setRoute(next);
+  }
+
+  async function run(fn, message = "") {
+    setLoading(true); setNotice("");
+    try { await fn(); if (message) setNotice(message); } catch (error) { setNotice(error.message || "요청 중 오류가 발생했습니다."); } finally { setLoading(false); }
+  }
+
+  async function loadItems() {
+    await run(async () => { const data = await api.listItems(); const list = Array.isArray(data) ? data : data?.items ?? []; setItems(list.map((item, index) => normalizeItem(item, index + 1))); });
+  }
+
+  async function openItem(item) {
+    const normalized = normalizeItem(item);
+    setSelectedItem(normalized); setRoute("detail");
+    if (normalized.itemId) await run(async () => { const detail = await api.findItem(normalized.itemId).catch(() => null); if (detail && typeof detail === "object") setSelectedItem(normalizeItem(detail, normalized.itemId)); });
+  }
+
+  async function submitAuth(event) {
+    event.preventDefault();
+    await run(async () => {
+      if (!authForm.loginId.trim() || !authForm.password.trim()) throw new Error("아이디와 비밀번호를 입력해주세요.");
+      if (authMode === "signup") { if (!authForm.name.trim() || !authForm.nickname.trim()) throw new Error("이름과 닉네임을 입력해주세요."); await api.signup(authForm); setAuthMode("login"); return; }
+      const loginMember = await api.login({ loginId: authForm.loginId, password: authForm.password }); setMember(loginMember); setRoute("home");
+    }, authMode === "signup" ? "회원가입이 완료되었습니다." : "로그인되었습니다.");
+  }
+
+  async function submitNew(event) {
+    event.preventDefault();
+    await run(async () => { if (!itemForm.name.trim() || !itemForm.price) throw new Error("상품명과 가격을 입력해주세요."); const created = normalizeItem(await api.createItem({ ...itemForm, price: Number(itemForm.price) })); setItems((current) => [created, ...current]); setSelectedItem(created); setRoute("detail"); }, "상품이 등록되었습니다.");
+  }
+
+  function startEdit() {
+    setItemForm({ name: selectedItem.name, description: selectedItem.description, price: String(selectedItem.price), status: selectedItem.status, category: selectedItem.category, imageUrl: selectedItem.imageUrl }); setRoute("edit");
+  }
+
+  async function submitEdit(event) {
+    event.preventDefault();
+    await run(async () => { const updated = normalizeItem(await api.updateItem(selectedItem.itemId, { ...itemForm, price: Number(itemForm.price) }), selectedItem.itemId); setSelectedItem(updated); setItems((current) => current.map((item) => item.itemId === selectedItem.itemId ? updated : item)); setRoute("detail"); }, "상품이 수정되었습니다.");
+  }
+
+  async function removeItem() {
+    await run(async () => { await api.deleteItem(selectedItem.itemId); setItems((current) => current.filter((item) => item.itemId !== selectedItem.itemId)); setSelectedItem(null); setRoute("home"); }, "상품이 삭제되었습니다.");
+  }
+
+  useEffect(() => { loadItems(); }, [api]);
+
+  return <><Nav member={member} useMock={useMock} setUseMock={setUseMock} go={go} logout={() => { setMember(null); setRoute("home"); }} />{notice && <div className="toast">{notice}</div>}{route === "home" && <Home items={items} category={category} search={search} setCategory={setCategory} setSearch={setSearch} openItem={openItem} />}{route === "detail" && <Detail item={selectedItem} member={member} go={go} edit={startEdit} remove={removeItem} loading={loading} />}{route === "auth" && <Auth mode={authMode} setMode={setAuthMode} form={authForm} change={(event) => setAuthForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitAuth} loading={loading} />}{route === "new" && <Editor title="상품 등록" form={itemForm} change={(event) => setItemForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitNew} cancel={() => go("home")} loading={loading} />}{route === "edit" && <Editor title="상품 수정" form={itemForm} change={(event) => setItemForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitEdit} cancel={() => go("detail")} loading={loading} />}</>;
 }

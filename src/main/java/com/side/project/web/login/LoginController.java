@@ -1,17 +1,17 @@
 package com.side.project.web.login;
 
+import com.side.project.domain.member.Member;
+import com.side.project.web.SessionConst;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Controller;
-import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
-@Controller
+@RestController
 @Slf4j
 @RequiredArgsConstructor
 public class LoginController {
@@ -24,15 +24,13 @@ public class LoginController {
     }
 
     @PostMapping("/login")
-    public String login(@Valid @ModelAttribute("loginForm") LoginForm loginForm , BindingResult bindingResult ,
-                        @RequestParam(defaultValue = "/") String redirectUrl,
-                        HttpServletRequest request) {
-        if(bindingResult.hasErrors()) {
-            return "login/loginForm";
-        }
-
-        log.info("redirectUrl = {}",redirectUrl);
-
-        return "redirect:/";
+    public ResponseEntity<?> login(@Valid @RequestBody LoginForm loginForm ,
+                                @RequestParam(defaultValue = "/") String redirectUrl,
+                                HttpServletRequest request) {
+        Member member = loginService.authenticate(loginForm);
+        LoginMember loginMember = new LoginMember(member.getId(),member.getLoginId(),member.getNickName());
+        HttpSession session = request.getSession();
+        session.setAttribute(SessionConst.LOGIN_MEMBER,loginMember);
+        return ResponseEntity.status(HttpStatus.OK).body(loginMember);
     }
 }

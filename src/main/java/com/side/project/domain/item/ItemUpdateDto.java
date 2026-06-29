@@ -3,9 +3,9 @@ package com.side.project.domain.item;
 import lombok.Data;
 
 @Data
-public class ItemUpdateParam {
+public class ItemUpdateDto {
 
-    private String title;
+    private String name;
     private String description;
     private Integer price;
     private ItemStatus status;

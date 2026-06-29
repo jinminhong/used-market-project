@@ -7,14 +7,14 @@ import lombok.Data;
 @Data
 public class ItemSaveForm {
 
+    private Long itemId;
+
     @NotEmpty
-    private String title;
+    private String name;
 
     private String description;
 
     @NotNull
     private Integer price;
 
-    @NotNull
-    private Long sellerId;
 }
