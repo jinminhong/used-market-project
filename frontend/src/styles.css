@@ -52,6 +52,10 @@ textarea { min-height: 150px; resize: vertical; }
 .wide-panel { width: min(720px, 100%); }
 .form-panel form { display: grid; gap: 12px; }
 .split-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.file-drop { display: grid; gap: 12px; border: 1px dashed #bcbcbc; background: #fafafa; padding: 14px; cursor: pointer; }
+.file-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.file-drop span { display: flex; align-items: center; justify-content: center; min-height: 48px; border: 1px solid #111111; background: #ffffff; font-size: 14px; font-weight: 900; }
+.file-drop img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: #eeeeee; }
 .toast { position: fixed; left: 50%; top: 78px; z-index: 20; transform: translateX(-50%); border: 1px solid #111111; background: #ffffff; padding: 12px 16px; font-size: 14px; font-weight: 900; box-shadow: 0 12px 32px rgba(0,0,0,0.12); }
 .narrow-page { padding: 40px 0; }
 .quiet-message { padding: 30px 0; }

@@ -1,5 +1,6 @@
-package com.side.project.domain.item;
+package com.side.project.domain.item.itemdto;
 
+import com.side.project.domain.item.ItemStatus;
 import lombok.Data;
 
 @Data

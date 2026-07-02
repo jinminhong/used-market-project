@@ -32,13 +32,17 @@ public class Member {
     @Column(nullable = false, length = 100)
     private String password;
 
+    @Embedded
+    private Address address;
+
     @OneToMany(mappedBy = "member")
     private List<Item> itemList = new ArrayList<>();
 
-    public Member(String loginId, String name, String password , String nickName) {
+    public Member(String loginId, String name, String password , String nickName ,Address address) {
         this.loginId = loginId;
         this.name = name;
         this.password = password;
         this.nickName = nickName;
+        this.address = address;
     }
 }

@@ -2,7 +2,7 @@ package com.side.project.web.login;
 
 import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
-import com.side.project.web.exception.LoginFailException;
+import com.side.project.web.exception.login.LoginFailException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 

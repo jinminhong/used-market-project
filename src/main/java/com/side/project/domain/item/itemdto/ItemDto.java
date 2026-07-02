@@ -1,5 +1,8 @@
-package com.side.project.domain.item;
+package com.side.project.domain.item.itemdto;
 
+import com.side.project.domain.item.Category;
+import com.side.project.domain.item.Item;
+import com.side.project.domain.item.ItemStatus;
 import com.side.project.domain.member.Member;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -12,9 +15,10 @@ public class ItemDto {
     private String description;
     private Integer price;
     private ItemStatus status;
+    private Category category;
     private String nickName;
 
-    public ItemDto(String name, String description, Integer price, ItemStatus status, Member member) {
+    public ItemDto(String name, String description, Integer price, ItemStatus status, Category category, Member member) {
         this.name = name;
         this.description = description;
         this.price = price;

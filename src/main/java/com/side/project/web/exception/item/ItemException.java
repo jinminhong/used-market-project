@@ -1,4 +1,4 @@
-package com.side.project.web.exception;
+package com.side.project.web.exception.item;
 
 public class ItemException extends RuntimeException {
     public ItemException(String message) {

@@ -1,10 +1,11 @@
-package com.side.project.domain.member;
+package com.side.project.domain.member.memberdto;
 
+import com.side.project.domain.member.Address;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.Data;
 
 @Data
-public class MemberSaveForm {
+public class MemberSaveDto {
 
     @NotEmpty
     private String loginId;
@@ -17,4 +18,6 @@ public class MemberSaveForm {
 
     @NotEmpty
     private String nickname;
+
+    private Address address;
 }

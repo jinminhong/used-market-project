@@ -1,17 +1,26 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 
-const CATEGORIES = ["All", "Outer", "Top", "Bag", "Shoes", "Accessory"];
+const CATEGORIES = ["All", "OUTER", "TOP", "BOTTOM", "BAG", "SHOES", "ACCESSORY", "ETC"];
 const STATUSES = ["SELLING", "RESERVED", "SOLD"];
 
 const sampleItems = [
-  { itemId: 1, name: "Archive Leather Jacket", description: "부드러운 양가죽 소재의 빈티지 재킷입니다. 자연스러운 사용감이 있고 전체적인 컨디션은 좋습니다.", price: 182000, status: "SELLING", nickName: "hong", category: "Outer", imageUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80" },
-  { itemId: 2, name: "Washed Cotton Shirt", description: "워싱감이 예쁜 코튼 셔츠입니다. 단품이나 이너로 활용하기 좋습니다.", price: 46000, status: "RESERVED", nickName: "lee", category: "Top", imageUrl: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=900&q=80" },
-  { itemId: 3, name: "Minimal Cross Bag", description: "데일리로 들기 좋은 크로스백입니다. 내부 수납 깨끗합니다.", price: 69000, status: "SELLING", nickName: "hong", category: "Bag", imageUrl: "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=900&q=80" },
-  { itemId: 4, name: "Suede Loafers", description: "스웨이드 로퍼 260 사이즈입니다. 밑창 마모 적습니다.", price: 88000, status: "SOLD", nickName: "mori", category: "Shoes", imageUrl: "https://images.unsplash.com/photo-1614252369475-531eba835eb1?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 1, name: "Archive Leather Jacket", description: "부드러운 양가죽 소재의 빈티지 재킷입니다. 자연스러운 사용감이 있고 전체적인 컨디션은 좋습니다.", price: 182000, status: "SELLING", nickName: "hong", category: "OUTER", imageUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 2, name: "Washed Cotton Shirt", description: "워싱감이 예쁜 코튼 셔츠입니다. 단품이나 이너로 활용하기 좋습니다.", price: 46000, status: "RESERVED", nickName: "lee", category: "TOP", imageUrl: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 3, name: "Minimal Cross Bag", description: "데일리로 들기 좋은 크로스백입니다. 내부 수납 깨끗합니다.", price: 69000, status: "SELLING", nickName: "hong", category: "BAG", imageUrl: "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 4, name: "Suede Loafers", description: "스웨이드 로퍼 260 사이즈입니다. 밑창 마모 적습니다.", price: 88000, status: "SOLD", nickName: "mori", category: "SHOES", imageUrl: "https://images.unsplash.com/photo-1614252369475-531eba835eb1?auto=format&fit=crop&w=900&q=80" },
 ];
 
 function defaultImage() {
   return "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=80";
+}
+
+function normalizeMember(member) {
+  if (!member) return null;
+  return {
+    memberId: member.memberId ?? member.id ?? null,
+    loginId: member.loginId ?? "",
+    nickName: member.nickName ?? member.nickname ?? "",
+  };
 }
 
 function normalizeItem(item, fallbackId) {
@@ -21,10 +30,23 @@ function normalizeItem(item, fallbackId) {
     description: item.description ?? "",
     price: Number(item.price ?? 0),
     status: item.status ?? "SELLING",
-    nickName: item.nickName ?? item.nickname ?? "seller",
-    category: item.category ?? "All",
+    nickName: item.nickName ?? item.nickname ?? "",
+    category: item.category ?? "ETC",
     imageUrl: item.imageUrl || defaultImage(),
   };
+}
+
+function buildItemFormData(data) {
+  const itemSaveDto = {
+    name: data.name,
+    description: data.description,
+    price: Number(data.price),
+    category: data.category === "All" ? "ETC" : data.category,
+  };
+  const formData = new FormData();
+  formData.append("itemSaveDto", new Blob([JSON.stringify(itemSaveDto)], { type: "application/json" }));
+  data.imageFiles.forEach((file) => formData.append("multipartFiles", file));
+  return formData;
 }
 
 function createApi(useMock) {
@@ -33,14 +55,17 @@ function createApi(useMock) {
 
   async function request(path, options = {}) {
     const method = options.method || "GET";
-    const body = options.body ? JSON.parse(options.body) : null;
+    const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+    const body = options.body && !isFormData ? JSON.parse(options.body) : null;
 
     if (useMock) return mockRequest(path, method, body);
 
-    const response = await fetch(path, {
+    const { headers: optionHeaders, ...fetchOptions } = options;
+    const headers = isFormData ? optionHeaders : { "Content-Type": "application/json", ...optionHeaders };
+    const response = await fetch(`/api${path}`, {
       credentials: "include",
-      headers: { "Content-Type": "application/json", ...options.headers },
-      ...options,
+      ...fetchOptions,
+      headers,
     });
     if (!response.ok) throw new Error((await response.text()) || `요청 실패 (${response.status})`);
     if (response.status === 204) return null;
@@ -81,7 +106,9 @@ function createApi(useMock) {
     signup: (data) => request("/members/add", { method: "POST", body: JSON.stringify(data) }),
     listItems: () => request("/items"),
     findItem: (id) => request(`/items/${id}`),
-    createItem: (data) => request("/items", { method: "POST", body: JSON.stringify(data) }),
+    createItem: (data) => useMock
+      ? request("/items", { method: "POST", body: JSON.stringify({ ...data, imageUrl: data.imagePreview || data.imageUrl }) })
+      : request("/items", { method: "POST", body: buildItemFormData(data) }),
     updateItem: (id, data) => request(`/items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deleteItem: (id) => request(`/items/${id}/delete`, { method: "POST" }),
   };
@@ -148,12 +175,12 @@ function Auth({ mode, setMode, form, change, submit, loading }) {
   return <main className="form-page"><section className="form-panel"><p>{mode === "login" ? "Welcome back" : "Create account"}</p><h1>{mode === "login" ? "로그인" : "회원가입"}</h1><form onSubmit={submit}><input name="loginId" value={form.loginId} onChange={change} placeholder="로그인 ID" /><input name="password" type="password" value={form.password} onChange={change} placeholder="비밀번호" />{mode === "signup" && <><input name="name" value={form.name} onChange={change} placeholder="이름" /><input name="nickname" value={form.nickname} onChange={change} placeholder="닉네임" /></>}<button disabled={loading}>{mode === "login" ? "로그인" : "가입하기"}</button></form><button className="text-button" type="button" onClick={() => setMode(mode === "login" ? "signup" : "login")}>{mode === "login" ? "계정 만들기" : "이미 계정이 있어요"}</button></section></main>;
 }
 
-function Editor({ title, form, change, submit, cancel, loading }) {
-  return <main className="form-page"><section className="form-panel wide-panel"><p>Seller studio</p><h1>{title}</h1><form onSubmit={submit}><input name="name" value={form.name} onChange={change} placeholder="상품명" /><div className="split-fields"><input name="price" type="number" min="0" value={form.price} onChange={change} placeholder="가격" /><select name="category" value={form.category} onChange={change}>{CATEGORIES.map((name) => <option key={name} value={name}>{name}</option>)}</select></div><input name="imageUrl" value={form.imageUrl} onChange={change} placeholder="이미지 URL" /><textarea name="description" value={form.description} onChange={change} placeholder="상품 설명" /><div className="split-fields"><select name="status" value={form.status} onChange={change}>{STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select><button disabled={loading}>저장</button></div></form><button className="text-button" type="button" onClick={cancel}>취소</button></section></main>;
+function Editor({ title, form, change, submit, cancel, loading, allowImageUpload }) {
+  return <main className="form-page"><section className="form-panel wide-panel"><p>Seller studio</p><h1>{title}</h1><form onSubmit={submit}><input name="name" value={form.name} onChange={change} placeholder="상품명" /><div className="split-fields"><input name="price" type="number" min="0" value={form.price} onChange={change} placeholder="가격" /><select name="category" value={form.category} onChange={change}>{CATEGORIES.filter((name) => name !== "All").map((name) => <option key={name} value={name}>{name}</option>)}</select></div>{allowImageUpload ? <label className="file-drop"><input name="imageFiles" type="file" accept="image/*" multiple onChange={change} /><span>{form.imageFiles.length ? `${form.imageFiles.length}개 이미지 선택됨` : "상품 이미지 선택"}</span>{form.imagePreview && <img src={form.imagePreview} alt="" />}</label> : <input name="imageUrl" value={form.imageUrl} onChange={change} placeholder="이미지 URL" />}<textarea name="description" value={form.description} onChange={change} placeholder="상품 설명" /><div className="split-fields"><select name="status" value={form.status} onChange={change}>{STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select><button disabled={loading}>저장</button></div></form><button className="text-button" type="button" onClick={cancel}>취소</button></section></main>;
 }
 
 export default function App() {
-  const [useMock, setUseMock] = useState(true);
+  const [useMock, setUseMock] = useState(false);
   const [route, setRoute] = useState("home");
   const [items, setItems] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -162,7 +189,7 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({ loginId: "asd", name: "", password: "1234", nickname: "" });
-  const [itemForm, setItemForm] = useState({ name: "", description: "", price: "", status: "SELLING", category: "All", imageUrl: "" });
+  const [itemForm, setItemForm] = useState({ name: "", description: "", price: "", status: "SELLING", category: "ETC", imageUrl: "", imageFiles: [], imagePreview: "" });
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const api = useMemo(() => createApi(useMock), [useMock]);
@@ -193,17 +220,30 @@ export default function App() {
     await run(async () => {
       if (!authForm.loginId.trim() || !authForm.password.trim()) throw new Error("아이디와 비밀번호를 입력해주세요.");
       if (authMode === "signup") { if (!authForm.name.trim() || !authForm.nickname.trim()) throw new Error("이름과 닉네임을 입력해주세요."); await api.signup(authForm); setAuthMode("login"); return; }
-      const loginMember = await api.login({ loginId: authForm.loginId, password: authForm.password }); setMember(loginMember); setRoute("home");
+      const loginMember = await api.login({ loginId: authForm.loginId, password: authForm.password }); setMember(normalizeMember(loginMember)); setRoute("home");
     }, authMode === "signup" ? "회원가입이 완료되었습니다." : "로그인되었습니다.");
   }
 
   async function submitNew(event) {
     event.preventDefault();
-    await run(async () => { if (!itemForm.name.trim() || !itemForm.price) throw new Error("상품명과 가격을 입력해주세요."); const created = normalizeItem(await api.createItem({ ...itemForm, price: Number(itemForm.price) })); setItems((current) => [created, ...current]); setSelectedItem(created); setRoute("detail"); }, "상품이 등록되었습니다.");
+    await run(async () => { if (!itemForm.name.trim() || !itemForm.price) throw new Error("상품명과 가격을 입력해주세요."); if (!itemForm.imageFiles.length) throw new Error("상품 이미지를 1장 이상 선택해주세요."); const created = normalizeItem(await api.createItem({ ...itemForm, price: Number(itemForm.price) })); const createdWithSeller = { ...created, nickName: created.nickName || member.nickName, imageUrl: created.imageUrl === defaultImage() ? itemForm.imagePreview : created.imageUrl }; setItems((current) => [createdWithSeller, ...current]); setSelectedItem(createdWithSeller); setItemForm({ name: "", description: "", price: "", status: "SELLING", category: "ETC", imageUrl: "", imageFiles: [], imagePreview: "" }); setRoute("detail"); }, "상품이 등록되었습니다.");
   }
 
   function startEdit() {
-    setItemForm({ name: selectedItem.name, description: selectedItem.description, price: String(selectedItem.price), status: selectedItem.status, category: selectedItem.category, imageUrl: selectedItem.imageUrl }); setRoute("edit");
+    setItemForm({ name: selectedItem.name, description: selectedItem.description, price: String(selectedItem.price), status: selectedItem.status, category: selectedItem.category, imageUrl: selectedItem.imageUrl, imageFiles: [], imagePreview: "" }); setRoute("edit");
+  }
+
+  function changeItemForm(event) {
+    const { name, value, files } = event.target;
+    if (name === "imageFiles") {
+      const imageFiles = Array.from(files ?? []);
+      setItemForm((current) => {
+        if (current.imagePreview?.startsWith("blob:")) URL.revokeObjectURL(current.imagePreview);
+        return { ...current, imageFiles, imagePreview: imageFiles[0] ? URL.createObjectURL(imageFiles[0]) : "" };
+      });
+      return;
+    }
+    setItemForm((current) => ({ ...current, [name]: value }));
   }
 
   async function submitEdit(event) {
@@ -217,5 +257,9 @@ export default function App() {
 
   useEffect(() => { loadItems(); }, [api]);
 
-  return <><Nav member={member} useMock={useMock} setUseMock={setUseMock} go={go} logout={() => { setMember(null); setRoute("home"); }} />{notice && <div className="toast">{notice}</div>}{route === "home" && <Home items={items} category={category} search={search} setCategory={setCategory} setSearch={setSearch} openItem={openItem} />}{route === "detail" && <Detail item={selectedItem} member={member} go={go} edit={startEdit} remove={removeItem} loading={loading} />}{route === "auth" && <Auth mode={authMode} setMode={setAuthMode} form={authForm} change={(event) => setAuthForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitAuth} loading={loading} />}{route === "new" && <Editor title="상품 등록" form={itemForm} change={(event) => setItemForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitNew} cancel={() => go("home")} loading={loading} />}{route === "edit" && <Editor title="상품 수정" form={itemForm} change={(event) => setItemForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitEdit} cancel={() => go("detail")} loading={loading} />}</>;
+  return <><Nav member={member} useMock={useMock} setUseMock={setUseMock} go={go} logout={() => { setMember(null); setRoute("home"); }} />{notice && <div className="toast">{notice}</div>}{route === "home" && <Home items={items} category={category} search={search} setCategory={setCategory} setSearch={setSearch} openItem={openItem} />}{route === "detail" && <Detail item={selectedItem} member={member} go={go} edit={startEdit} remove={removeItem} loading={loading} />}{route === "auth" && <Auth mode={authMode} setMode={setAuthMode} form={authForm} change={(event) => setAuthForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitAuth} loading={loading} />}{route === "new" && <Editor title="상품 등록" form={itemForm} change={changeItemForm} submit={submitNew} cancel={() => go("home")} loading={loading} allowImageUpload />}{route === "edit" && <Editor title="상품 수정" form={itemForm} change={changeItemForm} submit={submitEdit} cancel={() => go("detail")} loading={loading} />}</>;
 }
+
+
+
+
