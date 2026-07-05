@@ -14,6 +14,11 @@ function defaultImage() {
   return "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=80";
 }
 
+function imageUrlFromItemImages(itemImages) {
+  const storedFilename = itemImages?.[0]?.storedFilename;
+  return storedFilename ? `/api/images/${encodeURIComponent(storedFilename)}` : "";
+}
+
 function normalizeMember(member) {
   if (!member) return null;
   return {
@@ -32,7 +37,7 @@ function normalizeItem(item, fallbackId) {
     status: item.status ?? "SELLING",
     nickName: item.nickName ?? item.nickname ?? "",
     category: item.category ?? "ETC",
-    imageUrl: item.imageUrl || defaultImage(),
+    imageUrl: item.imageUrl || imageUrlFromItemImages(item.itemImages) || defaultImage(),
   };
 }
 

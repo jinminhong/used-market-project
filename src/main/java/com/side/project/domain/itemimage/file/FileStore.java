@@ -20,15 +20,26 @@ public class FileStore {
         return fileDir + filename;
     }
 
-    public String storeFile(MultipartFile multipartFile) throws IOException {
+    public List<UploadFile> storeFiles(List<MultipartFile> multipartFiles) throws IOException {
+        List<UploadFile> storeFileResult = new ArrayList<>();
+        for (MultipartFile multipartFile : multipartFiles) {
+            if (!multipartFile.isEmpty()) {
+                storeFileResult.add(storeFile(multipartFile));
+            }
+        }
+        return storeFileResult;
+    }
+
+    public UploadFile storeFile(MultipartFile multipartFile) throws IOException {
         String originalFilename = multipartFile.getOriginalFilename();
         String storeFileName = createStoreFileName(originalFilename);
+        UploadFile uploadFile = new UploadFile(multipartFile.getOriginalFilename(), createStoreFileName(originalFilename));
 
         multipartFile.transferTo(
                 new File(fileDir + storeFileName)
         );
 
-        return storeFileName;
+        return uploadFile;
     }
 
     private String createStoreFileName(String originalFilename) {

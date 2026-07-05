@@ -2,13 +2,16 @@ package com.side.project.domain.item;
 
 import com.side.project.domain.item.itemdto.ItemDto;
 import com.side.project.domain.item.itemdto.ItemSaveDto;
+import com.side.project.domain.item.itemdto.ItemUpdateDto;
 import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.itemimage.ItemImageRepository;
 import com.side.project.domain.itemimage.file.FileStore;
+import com.side.project.domain.itemimage.file.UploadFile;
 import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
 import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.item.ItemException;
+import com.side.project.web.exception.member.MemberException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,12 +39,21 @@ public class ItemService {
 
         Item item = new Item(itemSaveDto.getName(), itemSaveDto.getDescription(), itemSaveDto.getPrice(), ItemStatus.SELLING, itemSaveDto.getCategory(), findMember);
 
-        for (MultipartFile multipartFile : multipartFiles) {
-            ItemImage itemImage = new ItemImage(multipartFile.getOriginalFilename(), fileStore.storeFile(multipartFile));
-            item.addItemImage(itemImage);
+        if (multipartFiles != null && !multipartFiles.isEmpty()) {
+            List<UploadFile> uploadFiles = fileStore.storeFiles(multipartFiles);
+
+            List<ItemImage> itemImageList = uploadFiles.stream()
+                    .map(uploadFile -> new ItemImage(uploadFile.getOriginalFilename(), uploadFile.getStoredFileName()))
+                    .collect(Collectors.toList());
+
+            for (ItemImage itemImage : itemImageList) {
+                item.addItemImage(itemImage);
+            }
+            itemSaveDto.setUploadFiles(uploadFiles);
         }
 
         itemRepository.save(item);
+
 
         return item.getId();
     }
@@ -50,13 +62,15 @@ public class ItemService {
         return itemRepository.findById(itemId);
     }
 
+    public ItemDto findByIdToDto(Long itemId) {
+         return findById(itemId).map(ItemDto::new).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+    }
+
     public List<ItemDto> findAll() {
         List<Item> result = itemRepository.findAll();
-        List<ItemDto> itemDtoResult = result.stream().map(
-                item -> new ItemDto(
-                        item.getName(), item.getDescription(),item.getPrice(), item.getStatus(), item.getCategory(), item.getMember()))
+        return result.stream().map(
+                        ItemDto::new)
                 .collect(Collectors.toList());
-        return itemDtoResult;
     }
 
     @Transactional
@@ -65,10 +79,37 @@ public class ItemService {
     }
 
     @Transactional
-    public ItemDto update(Long itemId , ItemDto itemDto) {
+    public ItemDto update(Long itemId , ItemUpdateDto itemUpdateDto ,List<MultipartFile> multipartFiles, String loginId) throws IOException {
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다. id=" + itemId));
-        item.updateItem(itemDto);
+
+        if (!item.getMember().getLoginId().equals(loginId)) {
+            throw new ItemException("상품을 수정할 권한이 없습니다");
+        }
+        List<Long> deletedFileIds = itemUpdateDto.getDeletedFileIds();
+
+        if (deletedFileIds != null && !deletedFileIds.isEmpty()) {
+            List<ItemImage> itemImageToDelete = item.getItemImages().stream()
+                    .filter(itemImage -> deletedFileIds.contains(itemImage.getId()))
+                    .toList();
+            for (ItemImage itemImage : itemImageToDelete) {
+                item.removeItemImage(itemImage);
+            }
+        }
+
+        if (multipartFiles != null && !multipartFiles.isEmpty()) {
+            List<UploadFile> uploadFiles = fileStore.storeFiles(multipartFiles);
+
+            List<ItemImage> itemImageList = uploadFiles.stream()
+                    .map(uploadFile -> new ItemImage(uploadFile.getOriginalFilename(), uploadFile.getStoredFileName()))
+                    .toList();
+
+            for (ItemImage itemImage : itemImageList) {
+                item.addItemImage(itemImage);
+            }
+        }
+
+        item.updateItem(itemUpdateDto);
         return new ItemDto(item);
     }
 }

@@ -2,6 +2,7 @@ package com.side.project.domain.item;
 
 import com.side.project.domain.item.itemdto.ItemDto;
 import com.side.project.domain.item.itemdto.ItemSaveDto;
+import com.side.project.domain.item.itemdto.ItemUpdateDto;
 import com.side.project.domain.member.MemberService;
 import com.side.project.web.SessionConst;
 import com.side.project.web.login.LoginMember;
@@ -48,6 +49,7 @@ public class ItemController {
         Long itemId = itemService.save(itemSaveDto, loginMember.getLoginId() ,multipartFiles);
         itemSaveDto.setItemId(itemId);
 
+
         return ResponseEntity.status(HttpStatus.CREATED).body(itemSaveDto);
     }
 
@@ -55,17 +57,34 @@ public class ItemController {
     @GetMapping("/items/{itemId}")
     public ResponseEntity<ItemDto> item(@PathVariable Long itemId) {
         // TODO: Call itemService.findById(itemId) and add it as "item".
-        ItemDto itemDto = itemService.findById(itemId).map(item ->
-                new ItemDto(item.getName(), item.getDescription(), item.getPrice(), item.getStatus(), item.getCategory(), item.getMember())).get();
+        ItemDto itemDto = itemService.findByIdToDto(itemId);
         return ResponseEntity.status(HttpStatus.OK).body(itemDto);
     }
 
 
     //상세 상품 수정
-    @PatchMapping("/items/{itemId}")
-    public ResponseEntity<ItemDto> patchItem(@PathVariable Long itemId ,
-                                             @RequestBody ItemDto itemDto) {
-        ItemDto updatedItemDto = itemService.update(itemId, itemDto);
+    @PatchMapping(value = "/items/{itemId}" ,consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> patchItem(@PathVariable Long itemId ,
+                                             @RequestPart("itemUpdateDto") ItemUpdateDto itemUpdateDto,
+                                             @RequestPart("multipartFiles") List<MultipartFile> multipartFiles,
+                                             HttpServletRequest request) throws IOException {
+
+        HttpSession session = request.getSession(false);
+
+        if (session == null) { //세션이 없음
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("로그인이 필요합니다.");
+        }
+
+        LoginMember sessionMember =
+                (LoginMember) session.getAttribute(SessionConst.LOGIN_MEMBER);
+
+        if (sessionMember == null) { //세션은 있는데 저장된 정보가 없음
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("로그인이 필요합니다.");
+        }
+
+        ItemDto updatedItemDto = itemService.update(itemId, itemUpdateDto, multipartFiles, sessionMember.getLoginId());
         return ResponseEntity.status(HttpStatus.OK).body(updatedItemDto);
     }
 

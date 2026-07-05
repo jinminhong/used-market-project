@@ -1,6 +1,7 @@
 package com.side.project.domain.item;
 
 import com.side.project.domain.item.itemdto.ItemDto;
+import com.side.project.domain.item.itemdto.ItemUpdateDto;
 import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.member.Member;
 import jakarta.persistence.*;
@@ -65,7 +66,7 @@ public class Item {
     }
 
 
-    public Item(String name, String description, Integer price, ItemStatus status, Category category , Member member) {
+    public Item(String name, String description, Integer price, ItemStatus status, Category category , Member member ) {
         this.name = name;
         this.description = description;
         this.price = price;
@@ -74,21 +75,22 @@ public class Item {
         assignSeller(member);
     }
 
-    public void updateItem(ItemDto itemDto){
-        if (itemDto.getName() != null) {
-            this.name = itemDto.getName();
+    public void updateItem(ItemUpdateDto itemUpdateDto){
+        if (itemUpdateDto.getName() != null) {
+            this.name = itemUpdateDto.getName();
         }
 
-        if (itemDto.getDescription() != null) {
-            this.description = itemDto.getDescription();
+        if (itemUpdateDto.getDescription() != null) {
+            this.description = itemUpdateDto.getDescription();
         }
 
-        if (itemDto.getPrice() != null) {
-            this.price = itemDto.getPrice();
+        if (itemUpdateDto.getPrice() != null) {
+            this.price = itemUpdateDto.getPrice();
         }
 
-        if (itemDto.getStatus() != null) {
-            this.status = itemDto.getStatus();
+        if (itemUpdateDto.getStatus() != null) {
+            this.status = itemUpdateDto.getStatus();
         }
+
     }
 }
