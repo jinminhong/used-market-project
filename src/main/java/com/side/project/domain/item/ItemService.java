@@ -10,9 +10,11 @@ import com.side.project.domain.itemimage.file.FileStore;
 import com.side.project.domain.itemimage.file.UploadFile;
 import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
+import com.side.project.web.exception.login.UnauthorizedException;
 import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.member.MemberException;
+import com.side.project.web.login.LoginMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -82,8 +84,12 @@ public class ItemService {
     }
 
     @Transactional
-    public void delete(Long itemId) {
-        itemRepository.deleteById(itemId);
+    public void delete(Long itemId , LoginMember loginMember) {
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+        if (!item.getMember().getLoginId().equals(loginMember.getLoginId())) {
+            throw new UnauthorizedException("상품을 삭제할 권한이 없습니다");
+        }
+        itemRepository.delete(item);
     }
 
     @Transactional

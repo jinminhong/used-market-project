@@ -100,5 +100,9 @@ public class Item {
             this.status = itemUpdateDto.getStatus();
         }
 
+        if (itemUpdateDto.getCategory() != null) {
+            this.category = itemUpdateDto.getCategory();
+        }
+
     }
 }

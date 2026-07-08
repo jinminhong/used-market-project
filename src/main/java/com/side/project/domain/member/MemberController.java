@@ -33,10 +33,16 @@ public class MemberController {
     @GetMapping("/members/me")
     public ResponseEntity<?> getMyInfo(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
+
+        if (session == null) { //세션이 없음
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("로그인이 필요합니다.");
+        }
+
         LoginMember sessionMember =
                 (LoginMember) session.getAttribute(SessionConst.LOGIN_MEMBER);
 
-        if (session == null ||sessionMember == null) { //세션이 없음
+        if (sessionMember == null) { //세션은 있는데 저장된 정보가 없음
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("로그인이 필요합니다.");
         }
@@ -52,10 +58,16 @@ public class MemberController {
                                           HttpServletRequest request,
                                           @RequestBody MemberUpdateDto memberUpdateDto) {
         HttpSession session = request.getSession(false);
+
+        if (session == null) { //세션이 없음
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("로그인이 필요합니다.");
+        }
+
         LoginMember sessionMember =
                 (LoginMember) session.getAttribute(SessionConst.LOGIN_MEMBER);
 
-        if (session == null ||sessionMember == null) { //세션이 없음
+        if (sessionMember == null) { //세션은 있는데 저장된 정보가 없음
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body("로그인이 필요합니다.");
         }

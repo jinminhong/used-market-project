@@ -24,10 +24,14 @@ public class LoginCheckInterceptor implements HandlerInterceptor {
         }
 
         HttpSession session = request.getSession(false);
-        LoginMember sessionMember =
-                (LoginMember) session.getAttribute(SessionConst.LOGIN_MEMBER);
 
-        if (session == null || sessionMember == null) { //세션이 없거나 세션에 저장된 회원정보가 없을 때
+        if (session == null) {
+            throw new UnauthorizedException("로그인이 필요합니다.");
+        }
+
+        LoginMember sessionMember = (LoginMember) session.getAttribute(SessionConst.LOGIN_MEMBER);
+
+        if (sessionMember == null) {
             throw new UnauthorizedException("로그인이 필요합니다.");
         }
         return true;
