@@ -17,6 +17,5 @@ public class ItemUpdateDto {
     private ItemStatus status;
     private Category category;
     private List<Long> deletedFileIds = new ArrayList<>();
-
     private List<UploadFile> uploadFiles = new ArrayList<>();
 }

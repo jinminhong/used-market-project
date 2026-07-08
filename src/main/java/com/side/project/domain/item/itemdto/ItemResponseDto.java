@@ -3,20 +3,15 @@ package com.side.project.domain.item.itemdto;
 import com.side.project.domain.item.Category;
 import com.side.project.domain.item.Item;
 import com.side.project.domain.item.ItemStatus;
-import com.side.project.domain.itemimage.ItemImage;
-import com.side.project.domain.itemimage.file.UploadFile;
 import com.side.project.domain.itemimage.file.UploadFileDto;
-import com.side.project.domain.member.Member;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Data
-@NoArgsConstructor
-public class ItemDto {
+public class ItemResponseDto {
 
     private Long id;
     private String name ;
@@ -25,10 +20,9 @@ public class ItemDto {
     private ItemStatus status;
     private Category category;
     private String nickName;
-    private List<UploadFileDto> itemImages = new ArrayList<>();
-//    private UploadFileDto uploadFileDto;
+    private UploadFileDto uploadFileDto;
 
-    public ItemDto(Item item) {
+    public ItemResponseDto(Item item) {
         this.id = item.getId();
         this.name = item.getName();
         this.description = item.getDescription();
@@ -36,9 +30,8 @@ public class ItemDto {
         this.status = item.getStatus();
         this.category = item.getCategory();
         this.nickName = item.getMember().getNickName();
-        this.itemImages = item.getItemImages().stream().map(itemImage ->
-                new UploadFileDto(itemImage.getId(),itemImage.getOriginalFilename(),itemImage.getStoredFilename()))
-                .collect(Collectors.toList());
-//        this.uploadFileDto = this.itemImages.get(0);
+        this.uploadFileDto = new UploadFileDto(item.getThumbnailImage().getId(),
+                item.getThumbnailImage().getOriginalFilename(),
+                item.getThumbnailImage().getStoredFilename());
     }
 }

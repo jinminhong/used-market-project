@@ -2,6 +2,7 @@ package com.side.project.domain.itemimage;
 
 import com.side.project.domain.itemimage.file.FileStore;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.MediaType;
@@ -16,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/images")
 @RequiredArgsConstructor
@@ -25,6 +27,7 @@ public class ItemImageController {
 
     @GetMapping("/{storedFilename:.+}")
     public ResponseEntity<Resource> image(@PathVariable String storedFilename) throws IOException {
+        log.info("storedFilename ={}" , storedFilename);
         if (storedFilename.contains("..") || storedFilename.contains("/") || storedFilename.contains("\\")) {
             return ResponseEntity.badRequest().build();
         }

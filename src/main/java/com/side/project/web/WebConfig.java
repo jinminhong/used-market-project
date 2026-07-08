@@ -15,11 +15,12 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 .excludePathPatterns(
                         "/",
-                        "/login",
-                        "/logout",
-                        "/members/add",
+                        "/api/login",
+                        "/api/logout",
+                        "/api/members/add",
                         "/css/**",
-                        "/error"
+                        "/error",
+                        "/api/images/**"
                 );
 
         // TODO:

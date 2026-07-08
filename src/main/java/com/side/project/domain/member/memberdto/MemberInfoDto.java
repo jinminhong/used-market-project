@@ -1,11 +1,13 @@
 package com.side.project.domain.member.memberdto;
 
 import com.side.project.domain.item.Item;
+import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class MemberMyInfoDto {
+@Data
+public class MemberInfoDto {
 
     private String loginId;
 

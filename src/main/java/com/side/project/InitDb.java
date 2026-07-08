@@ -3,6 +3,7 @@ package com.side.project;
 import com.side.project.domain.item.Category;
 import com.side.project.domain.item.Item;
 import com.side.project.domain.item.ItemStatus;
+import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.member.Address;
 import com.side.project.domain.member.Member;
 import jakarta.persistence.EntityManager;
@@ -11,6 +12,9 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Component
 public class InitDb implements ApplicationRunner {
@@ -21,19 +25,41 @@ public class InitDb implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        Member member1 = new Member("asd", "hong", "1234", "hong" ,new Address("서울","도로","우리집"));
-        Member member2 = new Member("lee", "lee", "1234", "lee" ,new Address("서울","도로","우리집"));
+        List<Member> members = new ArrayList<>();
 
-        em.persist(member1);
-        em.persist(member2);
+        for (int i = 1; i <= 100; i++) {
+            Member member = new Member(
+                    "user" + i,
+                    "member" + i,
+                    "1234",
+                    "nickname" + i,
+                    new Address("city" + i, "street" + i, String.format("%05d", i))
+            );
+
+            em.persist(member);
+            members.add(member);
+        }
 
         em.flush();
 
+        Category[] categories = Category.values();
+        ItemStatus[] statuses = ItemStatus.values();
 
-        Item item1 = new Item("item1" , "good",10000, ItemStatus.SELLING, Category.OUTER ,member1);
-        Item item2 = new Item("item2" , "bad",20000, ItemStatus.SELLING, Category.BOTTOM, member2);
+        for (int i = 1; i <= 1000; i++) {
+            Member seller = members.get((i - 1) % members.size());
+            Item item = new Item(
+                    "item" + i,
+                    "description" + i,
+                    1000 + (i * 100),
+                    statuses[(i - 1) % statuses.length],
+                    categories[(i - 1) % categories.length],
+                    seller
+            );
 
-        em.persist(item1);
-        em.persist(item2);
+            item.addItemImage(new ItemImage("item" + i + "-image1.jpg", "stored-item" + i + "-image1.jpg"));
+            item.addItemImage(new ItemImage("item" + i + "-image2.jpg", "stored-item" + i + "-image2.jpg"));
+
+            em.persist(item);
+        }
     }
 }

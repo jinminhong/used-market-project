@@ -15,8 +15,13 @@ function defaultImage() {
 }
 
 function imageUrlFromItemImages(itemImages) {
-  const storedFilename = itemImages?.[0]?.storedFilename;
-  return storedFilename ? `/api/images/${encodeURIComponent(storedFilename)}` : "";
+  const storedFileName = itemImages?.[0]?.storedFileName ?? itemImages?.[0]?.storedFilename;
+  return storedFileName ? `/api/images/${encodeURIComponent(storedFileName)}` : "";
+}
+
+function imageUrlFromUploadFile(uploadFile) {
+  const storedFileName = uploadFile?.storedFileName ?? uploadFile?.storedFilename;
+  return storedFileName ? `/api/images/${encodeURIComponent(storedFileName)}` : "";
 }
 
 function normalizeMember(member) {
@@ -29,6 +34,8 @@ function normalizeMember(member) {
 }
 
 function normalizeItem(item, fallbackId) {
+  const itemImages = item.itemImages ?? (item.uploadFileDto ? [item.uploadFileDto] : []);
+
   return {
     itemId: item.itemId ?? item.id ?? fallbackId ?? null,
     name: item.name ?? item.title ?? "이름 없는 상품",
@@ -37,20 +44,29 @@ function normalizeItem(item, fallbackId) {
     status: item.status ?? "SELLING",
     nickName: item.nickName ?? item.nickname ?? "",
     category: item.category ?? "ETC",
-    imageUrl: item.imageUrl || imageUrlFromItemImages(item.itemImages) || defaultImage(),
+    itemImages,
+    imageUrl: item.imageUrl || imageUrlFromUploadFile(item.uploadFileDto) || imageUrlFromItemImages(itemImages) || defaultImage(),
   };
 }
 
-function buildItemFormData(data) {
-  const itemSaveDto = {
+function buildItemFormData(data, dtoPartName, includeEmptyFilePart = false) {
+  const itemDto = {
     name: data.name,
     description: data.description,
     price: Number(data.price),
     category: data.category === "All" ? "ETC" : data.category,
   };
+  if (dtoPartName === "itemUpdateDto") {
+    itemDto.status = data.status;
+    itemDto.deletedFileIds = data.deletedFileIds ?? [];
+  }
   const formData = new FormData();
-  formData.append("itemSaveDto", new Blob([JSON.stringify(itemSaveDto)], { type: "application/json" }));
-  data.imageFiles.forEach((file) => formData.append("multipartFiles", file));
+  formData.append(dtoPartName, new Blob([JSON.stringify(itemDto)], { type: "application/json" }));
+  if (data.imageFiles.length) {
+    data.imageFiles.forEach((file) => formData.append("multipartFiles", file));
+  } else if (includeEmptyFilePart) {
+    formData.append("multipartFiles", new Blob([]), "");
+  }
   return formData;
 }
 
@@ -86,7 +102,15 @@ function createApi(useMock) {
       return mockMember;
     }
     if (path === "/members/add" && method === "POST") return body;
-    if (path === "/items" && method === "GET") return mockItems;
+    if (path.startsWith("/items") && method === "GET") {
+      const params = new URLSearchParams(path.split("?")[1] ?? "");
+      const page = Number(params.get("page") ?? 0);
+      const size = Number(params.get("size") ?? 10);
+      const start = page * size;
+      const items = mockItems.slice(start, start + size);
+      const hasNext = start + size < mockItems.length;
+      return { items, hasNext, page, size, nextPage: hasNext ? page + 1 : null };
+    }
     if (path === "/items" && method === "POST") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
       const item = { ...body, itemId: Date.now(), price: Number(body.price), status: "SELLING", nickName: mockMember.nickName, imageUrl: body.imageUrl || defaultImage() };
@@ -109,12 +133,14 @@ function createApi(useMock) {
   return {
     login: (data) => request("/login", { method: "POST", body: JSON.stringify(data) }),
     signup: (data) => request("/members/add", { method: "POST", body: JSON.stringify(data) }),
-    listItems: () => request("/items"),
+    listItems: (page = 0, size = 10) => request(`/items?page=${page}&size=${size}`),
     findItem: (id) => request(`/items/${id}`),
     createItem: (data) => useMock
       ? request("/items", { method: "POST", body: JSON.stringify({ ...data, imageUrl: data.imagePreview || data.imageUrl }) })
-      : request("/items", { method: "POST", body: buildItemFormData(data) }),
-    updateItem: (id, data) => request(`/items/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+      : request("/items", { method: "POST", body: buildItemFormData(data, "itemSaveDto") }),
+    updateItem: (id, data) => useMock
+      ? request(`/items/${id}`, { method: "PATCH", body: JSON.stringify({ ...data, imageUrl: data.imagePreview || data.imageUrl }) })
+      : request(`/items/${id}`, { method: "PATCH", body: buildItemFormData(data, "itemUpdateDto", true) }),
     deleteItem: (id) => request(`/items/${id}/delete`, { method: "POST" }),
   };
 }
@@ -135,7 +161,7 @@ function Nav({ member, useMock, setUseMock, go, logout }) {
   );
 }
 
-function Home({ items, category, search, setCategory, setSearch, openItem }) {
+function Home({ items, category, search, setCategory, setSearch, openItem, hasNext, loadingMore }) {
   const visibleItems = items.filter((item) => {
     const keyword = search.trim().toLowerCase();
     return (category === "All" || item.category === category) && (!keyword || `${item.name} ${item.description} ${item.nickName}`.toLowerCase().includes(keyword));
@@ -152,20 +178,40 @@ function Home({ items, category, search, setCategory, setSearch, openItem }) {
         {visibleItems.map((item, index) => <button className="product-card" type="button" key={`${item.itemId ?? item.name}-${index}`} onClick={() => openItem(item)}><span className="product-image-wrap"><img src={item.imageUrl} alt="" /><span className={`status-pill ${item.status.toLowerCase()}`}>{item.status}</span></span><span className="product-info"><strong>{item.name}</strong><span>{item.price.toLocaleString()}원</span><em>@{item.nickName}</em></span></button>)}
       </section>
       {visibleItems.length === 0 && <p className="quiet-message">조건에 맞는 상품이 없습니다.</p>}
+      {loadingMore && <p className="quiet-message">상품을 더 불러오는 중입니다.</p>}
+      {!hasNext && items.length > 0 && <p className="quiet-message">마지막 상품까지 모두 봤습니다.</p>}
     </main>
   );
 }
 
 function Detail({ item, member, go, edit, remove, loading }) {
+  const imageUrls = (item?.itemImages ?? []).map(imageUrlFromUploadFile).filter(Boolean);
+  const slideImages = imageUrls.length ? imageUrls : [item?.imageUrl || defaultImage()];
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [item?.itemId, slideImages.length]);
+
   if (!item) return <main className="page-shell narrow-page"><button className="text-button" type="button" onClick={() => go("home")}>Back to shop</button><p className="quiet-message">상품을 찾을 수 없습니다.</p></main>;
   const isOwner = member?.nickName === item.nickName;
   const canMutate = isOwner && item.itemId;
+
+  function moveSlide(step) {
+    setActiveImageIndex((current) => (current + step + slideImages.length) % slideImages.length);
+  }
 
   return (
     <main className="detail-page">
       <button className="text-button" type="button" onClick={() => go("home")}>Back to shop</button>
       <section className="detail-layout">
-        <div className="detail-image"><img src={item.imageUrl} alt="" /></div>
+        <div className="detail-gallery">
+          <div className="detail-image">
+            <img src={slideImages[activeImageIndex]} alt="" />
+            {slideImages.length > 1 && <><button className="slide-button prev" type="button" onClick={() => moveSlide(-1)} aria-label="이전 이미지">‹</button><button className="slide-button next" type="button" onClick={() => moveSlide(1)} aria-label="다음 이미지">›</button></>}
+          </div>
+          {slideImages.length > 1 && <div className="thumbnail-row">{slideImages.map((imageUrl, index) => <button key={`${imageUrl}-${index}`} className={activeImageIndex === index ? "active" : ""} type="button" onClick={() => setActiveImageIndex(index)} aria-label={`${index + 1}번째 이미지 보기`}><img src={imageUrl} alt="" /></button>)}</div>}
+        </div>
         <aside className="detail-info">
           <div className="seller-line"><span>@{item.nickName}</span><span className={`status-pill ${item.status.toLowerCase()}`}>{item.status}</span></div>
           <h1>{item.name}</h1><strong className="detail-price">{item.price.toLocaleString()}원</strong><p>{item.description || "등록된 설명이 없습니다."}</p>
@@ -180,8 +226,8 @@ function Auth({ mode, setMode, form, change, submit, loading }) {
   return <main className="form-page"><section className="form-panel"><p>{mode === "login" ? "Welcome back" : "Create account"}</p><h1>{mode === "login" ? "로그인" : "회원가입"}</h1><form onSubmit={submit}><input name="loginId" value={form.loginId} onChange={change} placeholder="로그인 ID" /><input name="password" type="password" value={form.password} onChange={change} placeholder="비밀번호" />{mode === "signup" && <><input name="name" value={form.name} onChange={change} placeholder="이름" /><input name="nickname" value={form.nickname} onChange={change} placeholder="닉네임" /></>}<button disabled={loading}>{mode === "login" ? "로그인" : "가입하기"}</button></form><button className="text-button" type="button" onClick={() => setMode(mode === "login" ? "signup" : "login")}>{mode === "login" ? "계정 만들기" : "이미 계정이 있어요"}</button></section></main>;
 }
 
-function Editor({ title, form, change, submit, cancel, loading, allowImageUpload }) {
-  return <main className="form-page"><section className="form-panel wide-panel"><p>Seller studio</p><h1>{title}</h1><form onSubmit={submit}><input name="name" value={form.name} onChange={change} placeholder="상품명" /><div className="split-fields"><input name="price" type="number" min="0" value={form.price} onChange={change} placeholder="가격" /><select name="category" value={form.category} onChange={change}>{CATEGORIES.filter((name) => name !== "All").map((name) => <option key={name} value={name}>{name}</option>)}</select></div>{allowImageUpload ? <label className="file-drop"><input name="imageFiles" type="file" accept="image/*" multiple onChange={change} /><span>{form.imageFiles.length ? `${form.imageFiles.length}개 이미지 선택됨` : "상품 이미지 선택"}</span>{form.imagePreview && <img src={form.imagePreview} alt="" />}</label> : <input name="imageUrl" value={form.imageUrl} onChange={change} placeholder="이미지 URL" />}<textarea name="description" value={form.description} onChange={change} placeholder="상품 설명" /><div className="split-fields"><select name="status" value={form.status} onChange={change}>{STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select><button disabled={loading}>저장</button></div></form><button className="text-button" type="button" onClick={cancel}>취소</button></section></main>;
+function Editor({ title, form, change, submit, cancel, loading, requireImage }) {
+  return <main className="form-page"><section className="form-panel wide-panel"><p>Seller studio</p><h1>{title}</h1><form onSubmit={submit}><input name="name" value={form.name} onChange={change} placeholder="상품명" /><div className="split-fields"><input name="price" type="number" min="0" value={form.price} onChange={change} placeholder="가격" /><select name="category" value={form.category} onChange={change}>{CATEGORIES.filter((name) => name !== "All").map((name) => <option key={name} value={name}>{name}</option>)}</select></div>{form.itemImages.length > 0 && <div className="existing-images">{form.itemImages.map((image) => <label key={image.itemImageId ?? image.storedFileName} className="existing-image"><img src={`/api/images/${encodeURIComponent(image.storedFileName ?? image.storedFilename)}`} alt="" /><span>{image.originalFilename}</span><input name="deletedFileIds" type="checkbox" value={image.itemImageId} checked={form.deletedFileIds.includes(image.itemImageId)} onChange={change} /></label>)}</div>}<label className="file-drop"><input name="imageFiles" type="file" accept="image/*" multiple onChange={change} /><span>{form.imageFiles.length ? `${form.imageFiles.length}개 이미지 선택됨` : requireImage ? "상품 이미지 선택" : "새 이미지 추가"}</span>{form.imagePreview && <img src={form.imagePreview} alt="" />}</label><textarea name="description" value={form.description} onChange={change} placeholder="상품 설명" /><div className="split-fields"><select name="status" value={form.status} onChange={change}>{STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}</select><button disabled={loading}>저장</button></div></form><button className="text-button" type="button" onClick={cancel}>취소</button></section></main>;
 }
 
 export default function App() {
@@ -194,15 +240,30 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [authMode, setAuthMode] = useState("login");
   const [authForm, setAuthForm] = useState({ loginId: "asd", name: "", password: "1234", nickname: "" });
-  const [itemForm, setItemForm] = useState({ name: "", description: "", price: "", status: "SELLING", category: "ETC", imageUrl: "", imageFiles: [], imagePreview: "" });
+  const [itemForm, setItemForm] = useState({ name: "", description: "", price: "", status: "SELLING", category: "ETC", imageUrl: "", imageFiles: [], imagePreview: "", itemImages: [], deletedFileIds: [] });
   const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
+  const [itemPage, setItemPage] = useState(0);
+  const [hasNextItems, setHasNextItems] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const api = useMemo(() => createApi(useMock), [useMock]);
+
+  function navigate(next, options = {}) {
+    setRoute(next);
+
+    const historyState = { route: next };
+    if (options.replace) {
+      window.history.replaceState(historyState, "", window.location.href);
+      return;
+    }
+
+    window.history.pushState(historyState, "", window.location.href);
+  }
 
   function go(next) {
     setNotice("");
-    if (next === "new" && !member) { setNotice("상품을 등록하려면 로그인해주세요."); setRoute("auth"); return; }
-    setRoute(next);
+    if (next === "new" && !member) { setNotice("상품을 등록하려면 로그인해주세요."); navigate("auth"); return; }
+    navigate(next);
   }
 
   async function run(fn, message = "") {
@@ -210,13 +271,54 @@ export default function App() {
     try { await fn(); if (message) setNotice(message); } catch (error) { setNotice(error.message || "요청 중 오류가 발생했습니다."); } finally { setLoading(false); }
   }
 
-  async function loadItems() {
-    await run(async () => { const data = await api.listItems(); const list = Array.isArray(data) ? data : data?.items ?? []; setItems(list.map((item, index) => normalizeItem(item, index + 1))); });
+  function readItemSlice(data, page, size) {
+    const list = Array.isArray(data) ? data : data?.items ?? data?.content ?? [];
+    return {
+      list,
+      hasNext: Array.isArray(data) ? list.length >= size : Boolean(data?.hasNext),
+      nextPage: Array.isArray(data) ? page + 1 : data?.nextPage ?? page + 1,
+    };
+  }
+
+  async function loadItems(page = 0, append = false) {
+    const size = 10;
+
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const data = await api.listItems(page, size);
+      const { list, hasNext, nextPage } = readItemSlice(data, page, size);
+      const normalizedItems = list.map((item, index) => normalizeItem(item, page * size + index + 1));
+      let addedCount = normalizedItems.length;
+
+      setItems((current) => {
+        if (!append) return normalizedItems;
+
+        const currentIds = new Set(current.map((item) => item.itemId));
+        const nextItems = normalizedItems.filter((item) => !currentIds.has(item.itemId));
+        addedCount = nextItems.length;
+        return [...current, ...nextItems];
+      });
+      setHasNextItems(append && addedCount === 0 ? false : hasNext);
+      setItemPage(nextPage);
+    } catch (error) {
+      setNotice(error.message || "상품을 불러오지 못했습니다.");
+    } finally {
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
+    }
   }
 
   async function openItem(item) {
     const normalized = normalizeItem(item);
-    setSelectedItem(normalized); setRoute("detail");
+    setSelectedItem(normalized); navigate("detail");
     if (normalized.itemId) await run(async () => { const detail = await api.findItem(normalized.itemId).catch(() => null); if (detail && typeof detail === "object") setSelectedItem(normalizeItem(detail, normalized.itemId)); });
   }
 
@@ -225,17 +327,17 @@ export default function App() {
     await run(async () => {
       if (!authForm.loginId.trim() || !authForm.password.trim()) throw new Error("아이디와 비밀번호를 입력해주세요.");
       if (authMode === "signup") { if (!authForm.name.trim() || !authForm.nickname.trim()) throw new Error("이름과 닉네임을 입력해주세요."); await api.signup(authForm); setAuthMode("login"); return; }
-      const loginMember = await api.login({ loginId: authForm.loginId, password: authForm.password }); setMember(normalizeMember(loginMember)); setRoute("home");
+      const loginMember = await api.login({ loginId: authForm.loginId, password: authForm.password }); setMember(normalizeMember(loginMember)); navigate("home");
     }, authMode === "signup" ? "회원가입이 완료되었습니다." : "로그인되었습니다.");
   }
 
   async function submitNew(event) {
     event.preventDefault();
-    await run(async () => { if (!itemForm.name.trim() || !itemForm.price) throw new Error("상품명과 가격을 입력해주세요."); if (!itemForm.imageFiles.length) throw new Error("상품 이미지를 1장 이상 선택해주세요."); const created = normalizeItem(await api.createItem({ ...itemForm, price: Number(itemForm.price) })); const createdWithSeller = { ...created, nickName: created.nickName || member.nickName, imageUrl: created.imageUrl === defaultImage() ? itemForm.imagePreview : created.imageUrl }; setItems((current) => [createdWithSeller, ...current]); setSelectedItem(createdWithSeller); setItemForm({ name: "", description: "", price: "", status: "SELLING", category: "ETC", imageUrl: "", imageFiles: [], imagePreview: "" }); setRoute("detail"); }, "상품이 등록되었습니다.");
+    await run(async () => { if (!itemForm.name.trim() || !itemForm.price) throw new Error("상품명과 가격을 입력해주세요."); if (!itemForm.imageFiles.length) throw new Error("상품 이미지를 1장 이상 선택해주세요."); const created = normalizeItem(await api.createItem({ ...itemForm, price: Number(itemForm.price) })); const createdWithSeller = { ...created, nickName: created.nickName || member.nickName, imageUrl: created.imageUrl === defaultImage() ? itemForm.imagePreview : created.imageUrl }; setItems((current) => [createdWithSeller, ...current]); setSelectedItem(createdWithSeller); setItemForm({ name: "", description: "", price: "", status: "SELLING", category: "ETC", imageUrl: "", imageFiles: [], imagePreview: "", itemImages: [], deletedFileIds: [] }); navigate("detail"); }, "상품이 등록되었습니다.");
   }
 
   function startEdit() {
-    setItemForm({ name: selectedItem.name, description: selectedItem.description, price: String(selectedItem.price), status: selectedItem.status, category: selectedItem.category, imageUrl: selectedItem.imageUrl, imageFiles: [], imagePreview: "" }); setRoute("edit");
+    setItemForm({ name: selectedItem.name, description: selectedItem.description, price: String(selectedItem.price), status: selectedItem.status, category: selectedItem.category, imageUrl: selectedItem.imageUrl, imageFiles: [], imagePreview: "", itemImages: selectedItem.itemImages ?? [], deletedFileIds: [] }); navigate("edit");
   }
 
   function changeItemForm(event) {
@@ -248,21 +350,62 @@ export default function App() {
       });
       return;
     }
+    if (name === "deletedFileIds") {
+      const fileId = Number(value);
+      setItemForm((current) => ({ ...current, deletedFileIds: event.target.checked ? [...current.deletedFileIds, fileId] : current.deletedFileIds.filter((id) => id !== fileId) }));
+      return;
+    }
     setItemForm((current) => ({ ...current, [name]: value }));
   }
 
   async function submitEdit(event) {
     event.preventDefault();
-    await run(async () => { const updated = normalizeItem(await api.updateItem(selectedItem.itemId, { ...itemForm, price: Number(itemForm.price) }), selectedItem.itemId); setSelectedItem(updated); setItems((current) => current.map((item) => item.itemId === selectedItem.itemId ? updated : item)); setRoute("detail"); }, "상품이 수정되었습니다.");
+    await run(async () => { const updated = normalizeItem(await api.updateItem(selectedItem.itemId, { ...itemForm, price: Number(itemForm.price) }), selectedItem.itemId); setSelectedItem(updated); setItems((current) => current.map((item) => item.itemId === selectedItem.itemId ? updated : item)); navigate("detail"); }, "상품이 수정되었습니다.");
   }
 
   async function removeItem() {
-    await run(async () => { await api.deleteItem(selectedItem.itemId); setItems((current) => current.filter((item) => item.itemId !== selectedItem.itemId)); setSelectedItem(null); setRoute("home"); }, "상품이 삭제되었습니다.");
+    await run(async () => { await api.deleteItem(selectedItem.itemId); setItems((current) => current.filter((item) => item.itemId !== selectedItem.itemId)); setSelectedItem(null); navigate("home"); }, "상품이 삭제되었습니다.");
   }
 
-  useEffect(() => { loadItems(); }, [api]);
+  useEffect(() => {
+    if (!window.history.state?.route) {
+      window.history.replaceState({ route: "home" }, "", window.location.href);
+    }
 
-  return <><Nav member={member} useMock={useMock} setUseMock={setUseMock} go={go} logout={() => { setMember(null); setRoute("home"); }} />{notice && <div className="toast">{notice}</div>}{route === "home" && <Home items={items} category={category} search={search} setCategory={setCategory} setSearch={setSearch} openItem={openItem} />}{route === "detail" && <Detail item={selectedItem} member={member} go={go} edit={startEdit} remove={removeItem} loading={loading} />}{route === "auth" && <Auth mode={authMode} setMode={setAuthMode} form={authForm} change={(event) => setAuthForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitAuth} loading={loading} />}{route === "new" && <Editor title="상품 등록" form={itemForm} change={changeItemForm} submit={submitNew} cancel={() => go("home")} loading={loading} allowImageUpload />}{route === "edit" && <Editor title="상품 수정" form={itemForm} change={changeItemForm} submit={submitEdit} cancel={() => go("detail")} loading={loading} />}</>;
+    function handlePopState(event) {
+      setNotice("");
+      setRoute(event.state?.route ?? "home");
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  useEffect(() => {
+    setItemPage(0);
+    setHasNextItems(true);
+    loadItems(0, false);
+  }, [api]);
+
+  useEffect(() => {
+    if (route !== "home") return;
+
+    function handleScroll() {
+      const scrollBottom = window.innerHeight + window.scrollY;
+      const documentHeight = document.documentElement.scrollHeight;
+      const shouldLoadMore = documentHeight - scrollBottom < 500;
+
+      if (shouldLoadMore && hasNextItems && !loadingMore && !loading) {
+        loadItems(itemPage, true);
+      }
+    }
+
+    window.addEventListener("scroll", handleScroll);
+    handleScroll();
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [route, hasNextItems, loadingMore, loading, itemPage, api]);
+
+  return <><Nav member={member} useMock={useMock} setUseMock={setUseMock} go={go} logout={() => { setMember(null); navigate("home"); }} />{notice && <div className="toast">{notice}</div>}{route === "home" && <Home items={items} category={category} search={search} setCategory={setCategory} setSearch={setSearch} openItem={openItem} hasNext={hasNextItems} loadingMore={loadingMore} />}{route === "detail" && <Detail item={selectedItem} member={member} go={go} edit={startEdit} remove={removeItem} loading={loading} />}{route === "auth" && <Auth mode={authMode} setMode={setAuthMode} form={authForm} change={(event) => setAuthForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitAuth} loading={loading} />}{route === "new" && <Editor title="상품 등록" form={itemForm} change={changeItemForm} submit={submitNew} cancel={() => go("home")} loading={loading} requireImage />}{route === "edit" && <Editor title="상품 수정" form={itemForm} change={changeItemForm} submit={submitEdit} cancel={() => go("detail")} loading={loading} />}</>;
 }
 
 

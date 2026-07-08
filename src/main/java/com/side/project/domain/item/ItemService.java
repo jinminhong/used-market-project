@@ -1,6 +1,7 @@
 package com.side.project.domain.item;
 
 import com.side.project.domain.item.itemdto.ItemDto;
+import com.side.project.domain.item.itemdto.ItemResponseDto;
 import com.side.project.domain.item.itemdto.ItemSaveDto;
 import com.side.project.domain.item.itemdto.ItemUpdateDto;
 import com.side.project.domain.itemimage.ItemImage;
@@ -13,6 +14,9 @@ import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.member.MemberException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -62,8 +66,12 @@ public class ItemService {
         return itemRepository.findById(itemId);
     }
 
+    public Optional<Item> findByIdWithMember(Long itemId){
+        return itemRepository.findByIdWithMember(itemId);
+    }
+
     public ItemDto findByIdToDto(Long itemId) {
-         return findById(itemId).map(ItemDto::new).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+         return findByIdWithMember(itemId).map(ItemDto::new).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
     }
 
     public List<ItemDto> findAll() {
@@ -111,5 +119,14 @@ public class ItemService {
 
         item.updateItem(itemUpdateDto);
         return new ItemDto(item);
+    }
+
+    public List<ItemResponseDto> findItemSlice() {
+        PageRequest pageRequest = PageRequest.of(0, 10);
+        Slice<Item> items = itemRepository.findAllSlice(pageRequest);
+        return items.getContent()
+                .stream()
+                .map(ItemResponseDto::new)
+                .toList();
     }
 }

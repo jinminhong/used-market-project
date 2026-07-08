@@ -33,7 +33,7 @@ public class FileStore {
     public UploadFile storeFile(MultipartFile multipartFile) throws IOException {
         String originalFilename = multipartFile.getOriginalFilename();
         String storeFileName = createStoreFileName(originalFilename);
-        UploadFile uploadFile = new UploadFile(multipartFile.getOriginalFilename(), createStoreFileName(originalFilename));
+        UploadFile uploadFile = new UploadFile(multipartFile.getOriginalFilename(), storeFileName);
 
         multipartFile.transferTo(
                 new File(fileDir + storeFileName)

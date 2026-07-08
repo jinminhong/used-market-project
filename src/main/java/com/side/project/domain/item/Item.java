@@ -43,6 +43,10 @@ public class Item {
     @JoinColumn(nullable = false, name = "members_id")
     private Member member;
 
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "thumbnail_image_id")
+    private ItemImage thumbnailImage;
+
     @OneToMany(
             mappedBy = "item",
             cascade = CascadeType.ALL,
@@ -53,6 +57,10 @@ public class Item {
     public void addItemImage(ItemImage itemImage) {
         itemImages.add(itemImage);
         itemImage.changeItem(this);
+
+        if (thumbnailImage == null) {
+            thumbnailImage = itemImage;
+        }
     }
 
     public void removeItemImage(ItemImage itemImage) {

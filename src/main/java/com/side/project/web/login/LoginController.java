@@ -19,11 +19,6 @@ public class LoginController {
 
     private final LoginService loginService;
 
-    @GetMapping("/login")
-    public String loginForm(@ModelAttribute("loginForm") LoginForm loginForm){
-        return "login/loginForm";
-    }
-
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginForm loginForm ,
                                 @RequestParam(defaultValue = "/") String redirectUrl,

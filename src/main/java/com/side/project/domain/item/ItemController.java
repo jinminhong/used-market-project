@@ -1,6 +1,7 @@
 package com.side.project.domain.item;
 
 import com.side.project.domain.item.itemdto.ItemDto;
+import com.side.project.domain.item.itemdto.ItemResponseDto;
 import com.side.project.domain.item.itemdto.ItemSaveDto;
 import com.side.project.domain.item.itemdto.ItemUpdateDto;
 import com.side.project.domain.member.MemberService;
@@ -29,13 +30,13 @@ public class ItemController {
     private final LoginService loginService;
 
     @GetMapping("/items")
-    public List<ItemDto> items() {
-        List<ItemDto> items = itemService.findAll();
-        return items;
+    public ResponseEntity<List<ItemResponseDto>> items() {
+        List<ItemResponseDto> items = itemService.findItemSlice();
+        return ResponseEntity.status(HttpStatus.OK).body(items);
     }
 
     @PostMapping(value = "/items" ,consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> addItem(@RequestPart("itemSaveDto") ItemSaveDto itemSaveDto,
+    public ResponseEntity<?> saveItem(@RequestPart("itemSaveDto") ItemSaveDto itemSaveDto,
                                      @RequestPart("multipartFiles") List<MultipartFile> multipartFiles,
                                                 HttpServletRequest request) throws IOException {
         HttpSession session = request.getSession(false);
@@ -60,7 +61,6 @@ public class ItemController {
         ItemDto itemDto = itemService.findByIdToDto(itemId);
         return ResponseEntity.status(HttpStatus.OK).body(itemDto);
     }
-
 
     //상세 상품 수정
     @PatchMapping(value = "/items/{itemId}" ,consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -89,9 +89,9 @@ public class ItemController {
     }
 
 
-    @PostMapping("/items/{itemId}/delete")
-    public String delete(@PathVariable Long itemId) {
-        // TODO: Call itemService.delete() and redirect to item list.
-        return "redirect:/items";
+    @DeleteMapping("/items/{itemId}")
+    public ResponseEntity<String> delete(@PathVariable Long itemId) {
+        itemService.delete(itemId);
+        return ResponseEntity.ok("삭제 완료");
     }
 }

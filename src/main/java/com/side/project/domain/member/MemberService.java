@@ -1,10 +1,15 @@
 package com.side.project.domain.member;
 
+import com.side.project.domain.member.memberdto.MemberInfoDto;
 import com.side.project.domain.member.memberdto.MemberSaveDto;
+import com.side.project.domain.member.memberdto.MemberUpdateDto;
+import com.side.project.web.exception.login.UnauthorizedException;
 import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.login.LoginMember;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,5 +58,33 @@ public class MemberService {
         return findById(memberId)
                .map(member -> new LoginMember(member.getId(), member.getLoginId(), member.getNickName()))
                .orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+    }
+
+    public MemberInfoDto getMemberInfo(Long memberId) {
+        Member member = findById(memberId)
+                .orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+
+        MemberInfoDto memberInfoDto = new MemberInfoDto();
+        memberInfoDto.setLoginId(member.getLoginId());
+        memberInfoDto.setNickName(member.getNickName());
+        memberInfoDto.setName(member.getName());
+        memberInfoDto.setItemList(member.getItemList());
+
+        return memberInfoDto;
+    }
+
+    @Transactional
+    public MemberUpdateDto update(Long memberId, MemberUpdateDto memberUpdateDto, LoginMember loginMember) {
+        Member member = findById(memberId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+        if (!loginMember.getLoginId().equals(member.getLoginId())) {
+            throw new UnauthorizedException("회원정보가 맞지 않습니다.");
+        }
+        memberRepository.findByNickName(memberUpdateDto.getNickname())
+                .ifPresent(existing -> {
+                    throw new DuplicateMemberException("이미 사용 중인 닉네임입니다.");
+                });
+
+        member.updateMember(memberUpdateDto);
+        return memberUpdateDto;
     }
 }

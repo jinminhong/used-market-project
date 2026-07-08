@@ -1,6 +1,7 @@
 package com.side.project.domain.member;
 
 import com.side.project.domain.item.Item;
+import com.side.project.domain.member.memberdto.MemberUpdateDto;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.Getter;
@@ -44,5 +45,20 @@ public class Member {
         this.password = password;
         this.nickName = nickName;
         this.address = address;
+    }
+
+    public void updateMember(MemberUpdateDto memberUpdateDto) {
+        if (memberUpdateDto.getName() != null) {
+            this.name = name;
+        }
+        if (memberUpdateDto.getPassword() != null) {
+            this.password = memberUpdateDto.getPassword();
+        }
+        if (memberUpdateDto.getNickname() != null) {
+            this.nickName = memberUpdateDto.getNickname();
+        }
+        if (memberUpdateDto.getAddress() != null) {
+            this.address = memberUpdateDto.getAddress();
+        }
     }
 }
