@@ -1,16 +1,10 @@
 package com.side.project.domain.item;
 
-import com.side.project.domain.item.itemdto.ItemDto;
-import com.side.project.domain.item.itemdto.ItemResponseDto;
-import com.side.project.domain.item.itemdto.ItemSaveDto;
-import com.side.project.domain.item.itemdto.ItemUpdateDto;
+import com.side.project.domain.item.itemdto.*;
 import com.side.project.domain.member.MemberService;
-import com.side.project.web.SessionConst;
 import com.side.project.web.argumentresolver.Login;
 import com.side.project.web.login.LoginMember;
 import com.side.project.web.login.LoginService;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -27,20 +21,18 @@ import java.util.List;
 public class ItemController {
 
     private final ItemService itemService;
-    private final MemberService memberService;
-    private final LoginService loginService;
 
     @GetMapping("/items")
-    public ResponseEntity<List<ItemResponseDto>> items() {
-        List<ItemResponseDto> items = itemService.findItemSlice();
-        return ResponseEntity.status(HttpStatus.OK).body(items);
+    public ResponseEntity<PageResponseDto> items(@RequestParam(defaultValue = "0") int page,
+                                                 @RequestParam(defaultValue = "10") int size) {
+        PageResponseDto itemSlice = itemService.findItemSlice(page, size);
+        return ResponseEntity.status(HttpStatus.OK).body(itemSlice);
     }
 
     @PostMapping(value = "/items" ,consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> saveItem(@RequestPart("itemSaveDto") ItemSaveDto itemSaveDto,
                                       @RequestPart("multipartFiles") List<MultipartFile> multipartFiles,
-                                      @Login LoginMember loginMember,
-                                                HttpServletRequest request) throws IOException {
+                                      @Login LoginMember loginMember) throws IOException {
         Long itemId = itemService.save(itemSaveDto, loginMember.getLoginId() ,multipartFiles);
         itemSaveDto.setItemId(itemId);
 
@@ -61,8 +53,8 @@ public class ItemController {
     public ResponseEntity<?> patchItem(@PathVariable Long itemId ,
                                              @Login LoginMember loginMember,
                                              @RequestPart("itemUpdateDto") ItemUpdateDto itemUpdateDto,
-                                             @RequestPart(value = "multipartFiles", required = false) List<MultipartFile> multipartFiles,
-                                             HttpServletRequest request) throws IOException {
+                                             @RequestPart(value = "multipartFiles", required = false) List<MultipartFile> multipartFiles
+                                       ) throws IOException {
 
         ItemDto updatedItemDto = itemService.update(itemId, itemUpdateDto, multipartFiles, loginMember.getLoginId());
         return ResponseEntity.status(HttpStatus.OK).body(updatedItemDto);
@@ -71,9 +63,8 @@ public class ItemController {
 
     @DeleteMapping("/items/{itemId}")
     public ResponseEntity<String> delete(@PathVariable Long itemId,
-                                         @Login LoginMember loginMember,
-                                         HttpServletRequest request) {
+                                         @Login LoginMember loginMember) {
         itemService.delete(itemId , loginMember);
-        return ResponseEntity.ok("삭제 완료");
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).body("삭제 완료");
     }
 }

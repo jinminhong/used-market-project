@@ -18,7 +18,8 @@ import java.util.stream.Collectors;
 @NoArgsConstructor
 public class ItemDto {
 
-    private Long id;
+    private Long itemId;
+    private Long memberId;
     private String name ;
     private String description;
     private Integer price;
@@ -29,12 +30,13 @@ public class ItemDto {
 //    private UploadFileDto uploadFileDto;
 
     public ItemDto(Item item) {
-        this.id = item.getId();
+        this.itemId = item.getId();
         this.name = item.getName();
         this.description = item.getDescription();
         this.price = item.getPrice();
         this.status = item.getStatus();
         this.category = item.getCategory();
+        this.memberId = item.getMember().getId();
         this.nickName = item.getMember().getNickName();
         this.itemImages = item.getItemImages().stream().map(itemImage ->
                 new UploadFileDto(itemImage.getId(),itemImage.getOriginalFilename(),itemImage.getStoredFilename()))

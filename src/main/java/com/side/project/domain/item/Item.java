@@ -19,7 +19,7 @@ public class Item {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "items_id")
+    @Column(name = "item_id")
     private Long id;
 
     @Column(nullable = false, length = 100)

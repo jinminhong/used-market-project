@@ -1,9 +1,6 @@
 package com.side.project.domain.item;
 
-import com.side.project.domain.item.itemdto.ItemDto;
-import com.side.project.domain.item.itemdto.ItemResponseDto;
-import com.side.project.domain.item.itemdto.ItemSaveDto;
-import com.side.project.domain.item.itemdto.ItemUpdateDto;
+import com.side.project.domain.item.itemdto.*;
 import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.itemimage.ItemImageRepository;
 import com.side.project.domain.itemimage.file.FileStore;
@@ -127,12 +124,14 @@ public class ItemService {
         return new ItemDto(item);
     }
 
-    public List<ItemResponseDto> findItemSlice() {
-        PageRequest pageRequest = PageRequest.of(0, 10);
+    public PageResponseDto findItemSlice(int page , int size) {
+        PageRequest pageRequest = PageRequest.of(page, size);
         Slice<Item> items = itemRepository.findAllSlice(pageRequest);
-        return items.getContent()
+        boolean hasNext = items.hasNext();
+        List<ItemResponseDto> list = items.getContent()
                 .stream()
                 .map(ItemResponseDto::new)
                 .toList();
+        return new PageResponseDto(list,hasNext);
     }
 }

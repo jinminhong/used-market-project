@@ -4,10 +4,10 @@ const CATEGORIES = ["All", "OUTER", "TOP", "BOTTOM", "BAG", "SHOES", "ACCESSORY"
 const STATUSES = ["SELLING", "RESERVED", "SOLD"];
 
 const sampleItems = [
-  { itemId: 1, name: "Archive Leather Jacket", description: "부드러운 양가죽 소재의 빈티지 재킷입니다. 자연스러운 사용감이 있고 전체적인 컨디션은 좋습니다.", price: 182000, status: "SELLING", nickName: "hong", category: "OUTER", imageUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80" },
-  { itemId: 2, name: "Washed Cotton Shirt", description: "워싱감이 예쁜 코튼 셔츠입니다. 단품이나 이너로 활용하기 좋습니다.", price: 46000, status: "RESERVED", nickName: "lee", category: "TOP", imageUrl: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=900&q=80" },
-  { itemId: 3, name: "Minimal Cross Bag", description: "데일리로 들기 좋은 크로스백입니다. 내부 수납 깨끗합니다.", price: 69000, status: "SELLING", nickName: "hong", category: "BAG", imageUrl: "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=900&q=80" },
-  { itemId: 4, name: "Suede Loafers", description: "스웨이드 로퍼 260 사이즈입니다. 밑창 마모 적습니다.", price: 88000, status: "SOLD", nickName: "mori", category: "SHOES", imageUrl: "https://images.unsplash.com/photo-1614252369475-531eba835eb1?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 1, memberId: 1, name: "Archive Leather Jacket", description: "부드러운 양가죽 소재의 빈티지 재킷입니다. 자연스러운 사용감이 있고 전체적인 컨디션은 좋습니다.", price: 182000, status: "SELLING", nickName: "hong", category: "OUTER", imageUrl: "https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 2, memberId: 2, name: "Washed Cotton Shirt", description: "워싱감이 예쁜 코튼 셔츠입니다. 단품이나 이너로 활용하기 좋습니다.", price: 46000, status: "RESERVED", nickName: "lee", category: "TOP", imageUrl: "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 3, memberId: 1, name: "Minimal Cross Bag", description: "데일리로 들기 좋은 크로스백입니다. 내부 수납 깨끗합니다.", price: 69000, status: "SELLING", nickName: "hong", category: "BAG", imageUrl: "https://images.unsplash.com/photo-1594223274512-ad4803739b7c?auto=format&fit=crop&w=900&q=80" },
+  { itemId: 4, memberId: 3, name: "Suede Loafers", description: "스웨이드 로퍼 260 사이즈입니다. 밑창 마모 적습니다.", price: 88000, status: "SOLD", nickName: "mori", category: "SHOES", imageUrl: "https://images.unsplash.com/photo-1614252369475-531eba835eb1?auto=format&fit=crop&w=900&q=80" },
 ];
 
 function defaultImage() {
@@ -38,6 +38,7 @@ function normalizeItem(item, fallbackId) {
 
   return {
     itemId: item.itemId ?? item.id ?? fallbackId ?? null,
+    memberId: item.memberId ?? item.sellerId ?? null,
     name: item.name ?? item.title ?? "이름 없는 상품",
     description: item.description ?? "",
     price: Number(item.price ?? 0),
@@ -46,6 +47,17 @@ function normalizeItem(item, fallbackId) {
     category: item.category ?? "ETC",
     itemImages,
     imageUrl: item.imageUrl || imageUrlFromUploadFile(item.uploadFileDto) || imageUrlFromItemImages(itemImages) || defaultImage(),
+  };
+}
+
+function normalizeShop(shop) {
+  if (!shop) return null;
+  return {
+    memberId: shop.memberId ?? shop.id ?? null,
+    loginId: shop.loginId ?? "",
+    nickName: shop.nickName ?? shop.nickname ?? "",
+    name: shop.name ?? "",
+    items: (shop.itemList ?? shop.items ?? []).map((item, index) => normalizeItem(item, index + 1)),
   };
 }
 
@@ -101,7 +113,19 @@ function createApi(useMock) {
       mockMember = { memberId: body.loginId === "lee" ? 2 : 1, loginId: body.loginId, nickName: body.loginId === "lee" ? "lee" : "hong" };
       return mockMember;
     }
-    if (path === "/members/add" && method === "POST") return body;
+    if (path === "/members" && method === "POST") return body;
+    const shopMemberId = Number(path.match(/\/members\/(\d+)\/shop/)?.[1]);
+    if (path.startsWith("/members/") && path.endsWith("/shop") && method === "GET") {
+      const shopItems = mockItems.filter((item) => item.memberId === shopMemberId);
+      const firstItem = shopItems[0];
+      return {
+        memberId: shopMemberId,
+        loginId: `user${shopMemberId}`,
+        nickName: firstItem?.nickName ?? `seller${shopMemberId}`,
+        name: firstItem?.nickName ?? `seller${shopMemberId}`,
+        itemList: shopItems,
+      };
+    }
     if (path.startsWith("/items") && method === "GET") {
       const params = new URLSearchParams(path.split("?")[1] ?? "");
       const page = Number(params.get("page") ?? 0);
@@ -123,7 +147,7 @@ function createApi(useMock) {
       mockItems = mockItems.map((item) => item.itemId === itemId ? { ...item, ...body, price: Number(body.price) } : item);
       return mockItems.find((item) => item.itemId === itemId);
     }
-    if (path.endsWith("/delete") && method === "POST") {
+    if (path.startsWith("/items/") && method === "DELETE") {
       mockItems = mockItems.filter((item) => item.itemId !== itemId);
       return null;
     }
@@ -132,7 +156,8 @@ function createApi(useMock) {
 
   return {
     login: (data) => request("/login", { method: "POST", body: JSON.stringify(data) }),
-    signup: (data) => request("/members/add", { method: "POST", body: JSON.stringify(data) }),
+    signup: (data) => request("/members", { method: "POST", body: JSON.stringify(data) }),
+    findShop: (memberId) => request(`/members/${memberId}/shop`),
     listItems: (page = 0, size = 10) => request(`/items?page=${page}&size=${size}`),
     findItem: (id) => request(`/items/${id}`),
     createItem: (data) => useMock
@@ -141,7 +166,7 @@ function createApi(useMock) {
     updateItem: (id, data) => useMock
       ? request(`/items/${id}`, { method: "PATCH", body: JSON.stringify({ ...data, imageUrl: data.imagePreview || data.imageUrl }) })
       : request(`/items/${id}`, { method: "PATCH", body: buildItemFormData(data, "itemUpdateDto", true) }),
-    deleteItem: (id) => request(`/items/${id}/delete`, { method: "POST" }),
+    deleteItem: (id) => request(`/items/${id}`, { method: "DELETE" }),
   };
 }
 
@@ -184,7 +209,7 @@ function Home({ items, category, search, setCategory, setSearch, openItem, hasNe
   );
 }
 
-function Detail({ item, member, go, edit, remove, loading }) {
+function Detail({ item, member, go, edit, remove, loading, openShop }) {
   const imageUrls = (item?.itemImages ?? []).map(imageUrlFromUploadFile).filter(Boolean);
   const slideImages = imageUrls.length ? imageUrls : [item?.imageUrl || defaultImage()];
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -213,11 +238,30 @@ function Detail({ item, member, go, edit, remove, loading }) {
           {slideImages.length > 1 && <div className="thumbnail-row">{slideImages.map((imageUrl, index) => <button key={`${imageUrl}-${index}`} className={activeImageIndex === index ? "active" : ""} type="button" onClick={() => setActiveImageIndex(index)} aria-label={`${index + 1}번째 이미지 보기`}><img src={imageUrl} alt="" /></button>)}</div>}
         </div>
         <aside className="detail-info">
-          <div className="seller-line"><span>@{item.nickName}</span><span className={`status-pill ${item.status.toLowerCase()}`}>{item.status}</span></div>
+          <div className="seller-line"><button className="seller-link" type="button" onClick={() => openShop(item.memberId)} disabled={!item.memberId}>@{item.nickName}</button><span className={`status-pill ${item.status.toLowerCase()}`}>{item.status}</span></div>
           <h1>{item.name}</h1><strong className="detail-price">{item.price.toLocaleString()}원</strong><p>{item.description || "등록된 설명이 없습니다."}</p>
           {isOwner ? <div className="owner-actions"><button type="button" onClick={edit} disabled={!canMutate || loading}>수정하기</button><button className="danger" type="button" onClick={remove} disabled={!canMutate || loading}>삭제하기</button>{!item.itemId && <small>현재 목록 응답에 상품 ID가 없어 실제 수정/삭제 요청은 보낼 수 없습니다.</small>}</div> : <div className="buyer-actions"><button type="button" onClick={() => !member && go("auth")}>{member ? "구매 문의" : "로그인하고 문의하기"}</button></div>}
         </aside>
       </section>
+    </main>
+  );
+}
+
+function Shop({ shop, openItem, go }) {
+  if (!shop) return <main className="page-shell narrow-page"><button className="text-button" type="button" onClick={() => go("home")}>Back to shop</button><p className="quiet-message">상점 정보를 찾을 수 없습니다.</p></main>;
+
+  return (
+    <main className="page-shell">
+      <section className="shop-hero">
+        <button className="text-button" type="button" onClick={() => go("home")}>Back to shop</button>
+        <p>Seller shop</p>
+        <h1>@{shop.nickName}</h1>
+        <span>{shop.items.length} items</span>
+      </section>
+      <section className="product-grid">
+        {shop.items.map((item, index) => <button className="product-card" type="button" key={`${item.itemId ?? item.name}-${index}`} onClick={() => openItem(item)}><span className="product-image-wrap"><img src={item.imageUrl} alt="" /><span className={`status-pill ${item.status.toLowerCase()}`}>{item.status}</span></span><span className="product-info"><strong>{item.name}</strong><span>{item.price.toLocaleString()}원</span><em>@{item.nickName}</em></span></button>)}
+      </section>
+      {shop.items.length === 0 && <p className="quiet-message">등록된 상품이 없습니다.</p>}
     </main>
   );
 }
@@ -235,6 +279,7 @@ export default function App() {
   const [route, setRoute] = useState("home");
   const [items, setItems] = useState([]);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedShop, setSelectedShop] = useState(null);
   const [member, setMember] = useState(null);
   const [category, setCategory] = useState("All");
   const [search, setSearch] = useState("");
@@ -272,7 +317,7 @@ export default function App() {
   }
 
   function readItemSlice(data, page, size) {
-    const list = Array.isArray(data) ? data : data?.items ?? data?.content ?? [];
+    const list = Array.isArray(data) ? data : data?.list ?? data?.items ?? data?.content ?? [];
     return {
       list,
       hasNext: Array.isArray(data) ? list.length >= size : Boolean(data?.hasNext),
@@ -320,6 +365,19 @@ export default function App() {
     const normalized = normalizeItem(item);
     setSelectedItem(normalized); navigate("detail");
     if (normalized.itemId) await run(async () => { const detail = await api.findItem(normalized.itemId).catch(() => null); if (detail && typeof detail === "object") setSelectedItem(normalizeItem(detail, normalized.itemId)); });
+  }
+
+  async function openShop(memberId) {
+    if (!memberId) {
+      setNotice("상점 정보를 열 수 없습니다.");
+      return;
+    }
+
+    await run(async () => {
+      const shop = await api.findShop(memberId);
+      setSelectedShop(normalizeShop({ ...shop, memberId }));
+      navigate("shop");
+    });
   }
 
   async function submitAuth(event) {
@@ -405,7 +463,7 @@ export default function App() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, [route, hasNextItems, loadingMore, loading, itemPage, api]);
 
-  return <><Nav member={member} useMock={useMock} setUseMock={setUseMock} go={go} logout={() => { setMember(null); navigate("home"); }} />{notice && <div className="toast">{notice}</div>}{route === "home" && <Home items={items} category={category} search={search} setCategory={setCategory} setSearch={setSearch} openItem={openItem} hasNext={hasNextItems} loadingMore={loadingMore} />}{route === "detail" && <Detail item={selectedItem} member={member} go={go} edit={startEdit} remove={removeItem} loading={loading} />}{route === "auth" && <Auth mode={authMode} setMode={setAuthMode} form={authForm} change={(event) => setAuthForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitAuth} loading={loading} />}{route === "new" && <Editor title="상품 등록" form={itemForm} change={changeItemForm} submit={submitNew} cancel={() => go("home")} loading={loading} requireImage />}{route === "edit" && <Editor title="상품 수정" form={itemForm} change={changeItemForm} submit={submitEdit} cancel={() => go("detail")} loading={loading} />}</>;
+  return <><Nav member={member} useMock={useMock} setUseMock={setUseMock} go={go} logout={() => { setMember(null); navigate("home"); }} />{notice && <div className="toast">{notice}</div>}{route === "home" && <Home items={items} category={category} search={search} setCategory={setCategory} setSearch={setSearch} openItem={openItem} hasNext={hasNextItems} loadingMore={loadingMore} />}{route === "detail" && <Detail item={selectedItem} member={member} go={go} edit={startEdit} remove={removeItem} loading={loading} openShop={openShop} />}{route === "shop" && <Shop shop={selectedShop} openItem={openItem} go={go} />}{route === "auth" && <Auth mode={authMode} setMode={setAuthMode} form={authForm} change={(event) => setAuthForm((current) => ({ ...current, [event.target.name]: event.target.value }))} submit={submitAuth} loading={loading} />}{route === "new" && <Editor title="상품 등록" form={itemForm} change={changeItemForm} submit={submitNew} cancel={() => go("home")} loading={loading} requireImage />}{route === "edit" && <Editor title="상품 수정" form={itemForm} change={changeItemForm} submit={submitEdit} cancel={() => go("detail")} loading={loading} />}</>;
 }
 
 

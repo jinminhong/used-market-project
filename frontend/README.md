@@ -45,3 +45,44 @@ Because of this proxy, you usually do not need CORS settings while developing lo
 
 When `Mock API` is checked, the frontend uses fake data and does not call Spring.
 When `Mock API` is unchecked, the frontend calls the Spring REST API.
+
+## Current API endpoints used by the frontend
+
+Auth and members:
+
+```text
+POST  /api/login
+POST  /api/members
+GET   /api/members/me
+PATCH /api/members/me
+GET   /api/members/{memberId}/shop
+```
+
+Items and images:
+
+```text
+GET    /api/items?page=0&size=10
+GET    /api/items/{itemId}
+POST   /api/items
+PATCH  /api/items/{itemId}
+DELETE /api/items/{itemId}
+GET    /api/images/{storedFilename}
+```
+
+The item list endpoint returns the current backend shape:
+
+```json
+{
+  "list": [],
+  "hasNext": true
+}
+```
+
+The frontend reads `list` and keeps requesting the next page while `hasNext` is `true`.
+
+Create and update item APIs use `multipart/form-data`:
+
+```text
+itemSaveDto or itemUpdateDto: JSON blob
+multipartFiles: image files
+```

@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 @Data
 public class ItemResponseDto {
 
-    private Long id;
+    private Long itemId;
     private String name ;
     private String description;
     private Integer price;
@@ -21,9 +21,11 @@ public class ItemResponseDto {
     private Category category;
     private String nickName;
     private UploadFileDto uploadFileDto;
+    private Integer page;
+    private Integer size;
 
     public ItemResponseDto(Item item) {
-        this.id = item.getId();
+        this.itemId = item.getId();
         this.name = item.getName();
         this.description = item.getDescription();
         this.price = item.getPrice();
@@ -33,5 +35,6 @@ public class ItemResponseDto {
         this.uploadFileDto = new UploadFileDto(item.getThumbnailImage().getId(),
                 item.getThumbnailImage().getOriginalFilename(),
                 item.getThumbnailImage().getStoredFilename());
+
     }
 }

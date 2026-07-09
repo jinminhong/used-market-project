@@ -27,7 +27,7 @@ public class InitDb implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         List<Member> members = new ArrayList<>();
 
-        for (int i = 1; i <= 100; i++) {
+        for (int i = 1; i <= 5; i++) {
             Member member = new Member(
                     "user" + i,
                     "member" + i,
@@ -45,8 +45,8 @@ public class InitDb implements ApplicationRunner {
         Category[] categories = Category.values();
         ItemStatus[] statuses = ItemStatus.values();
 
-        for (int i = 1; i <= 1000; i++) {
-            Member seller = members.get((i - 1) % members.size());
+        for (int i = 1; i <= 50; i++) {
+            Member seller = members.get((i - 1) / 10);
             Item item = new Item(
                     "item" + i,
                     "description" + i,

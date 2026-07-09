@@ -1,6 +1,7 @@
 package com.side.project.domain.member;
 
-import com.side.project.domain.member.memberdto.MemberInfoDto;
+import com.side.project.domain.item.itemdto.ItemResponseDto;
+import com.side.project.domain.member.memberdto.ShopInfoDto;
 import com.side.project.domain.member.memberdto.MemberSaveDto;
 import com.side.project.domain.member.memberdto.MemberUpdateDto;
 import com.side.project.web.exception.login.UnauthorizedException;
@@ -8,8 +9,6 @@ import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.login.LoginMember;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,22 +59,20 @@ public class MemberService {
                .orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
     }
 
-    public MemberInfoDto getMemberInfo(Long memberId) {
+    public ShopInfoDto getMemberInfo(Long memberId) {
         Member member = findById(memberId)
                 .orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
 
-        MemberInfoDto memberInfoDto = new MemberInfoDto();
-        memberInfoDto.setLoginId(member.getLoginId());
-        memberInfoDto.setNickName(member.getNickName());
-        memberInfoDto.setName(member.getName());
-        memberInfoDto.setItemList(member.getItemList());
-
-        return memberInfoDto;
+        ShopInfoDto shopInfoDto = new ShopInfoDto();
+        shopInfoDto.setNickName(member.getNickName());
+        shopInfoDto.setName(member.getName());
+        shopInfoDto.setItemList(member.getItemList().stream().map(ItemResponseDto::new).toList());
+        return shopInfoDto;
     }
 
     @Transactional
-    public MemberUpdateDto update(Long memberId, MemberUpdateDto memberUpdateDto, LoginMember loginMember) {
-        Member member = findById(memberId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+    public MemberUpdateDto update(LoginMember loginMember ,MemberUpdateDto memberUpdateDto) {
+        Member member = findById(loginMember.getMemberId()).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
         if (!loginMember.getLoginId().equals(member.getLoginId())) {
             throw new UnauthorizedException("회원정보가 맞지 않습니다.");
         }

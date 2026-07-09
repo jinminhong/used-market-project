@@ -49,7 +49,7 @@ public class Member {
 
     public void updateMember(MemberUpdateDto memberUpdateDto) {
         if (memberUpdateDto.getName() != null) {
-            this.name = name;
+            this.name = memberUpdateDto.getName();
         }
         if (memberUpdateDto.getPassword() != null) {
             this.password = memberUpdateDto.getPassword();

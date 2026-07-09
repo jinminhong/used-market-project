@@ -1,388 +1,166 @@
-﻿프론트 화면별 API / JSON 스펙 메모
-작성 기준: React 프론트 + 현재 Spring Controller @RequestMapping("/api") 적용 상태
+Frontend API Spec
+Base URL in React: /api
+Local dev proxy: http://localhost:5173/api -> http://localhost:8080/api
 
-============================================================
-0. 공통 규칙
-============================================================
+Common
+- Use fetch with credentials: "include" for APIs that need session login.
+- JSON requests use Content-Type: application/json.
+- Multipart item create/update requests must not set Content-Type manually.
 
-- 프론트 화면 이동은 React 내부 상태로 처리한다.
-  예: Shop, Login, Sell, Detail, Edit
+1. Auth
 
-- 실제 백엔드 API 호출은 항상 /api prefix를 붙인다.
-  예: /api/items, /api/login, /api/members/add
-
-- Vite 개발 서버 프록시
-  브라우저 요청: http://localhost:5173/api/...
-  실제 전달: http://localhost:8080/api/...
-
-- 로그인 이후 세션 쿠키를 유지해야 하므로 fetch 옵션에 credentials: "include"를 사용한다.
-
-- JSON 요청 공통 헤더
-  Content-Type: application/json
-
-============================================================
-1. 첫 화면 - 상품 목록 페이지
-============================================================
-
-화면 역할
-- 전체 상품 목록을 카드 그리드로 보여준다.
-- 상품명, 가격, 판매자 닉네임, 판매 상태를 표시한다.
-- 상품 카드를 누르면 상품 상세 페이지로 이동한다.
-
-호출 API
-GET /api/items
-
-요청 Body
-없음
-
-현재 백엔드 응답 예시
-[
-  {
-    "name": "item1",
-    "description": "good",
-    "price": 10000,
-    "status": "SELLING",
-    "nickName": "hong"
-  },
-  {
-    "name": "item2",
-    "description": "bad",
-    "price": 20000,
-    "status": "SELLING",
-    "nickName": "lee"
-  }
-]
-
-프론트에서 사용하는 필드
-- name: 상품명
-- description: 상품 설명
-- price: 가격
-- status: SELLING / RESERVED / SOLD
-- nickName: 판매자 닉네임
-
-현재 주의점
-- 현재 목록 응답에는 itemId가 없다.
-- 상품 상세 조회, 수정, 삭제를 정확하게 하려면 목록 응답에도 itemId가 내려오는 것이 좋다.
-
-프론트에서 기대하는 권장 응답
-[
-  {
-    "itemId": 1,
-    "name": "item1",
-    "description": "good",
-    "price": 10000,
-    "status": "SELLING",
-    "nickName": "hong"
-  }
-]
-
-============================================================
-2. 로그인 화면
-============================================================
-
-화면 역할
-- 네비게이션 바의 Login 버튼을 눌렀을 때 표시한다.
-- 로그인 성공 시 상단에 로그인 사용자 닉네임을 표시한다.
-- 로그인 성공 후 상품 등록, 본인 상품 수정/삭제 권한 판단에 사용한다.
-
-호출 API
 POST /api/login
-
-요청 JSON
+Purpose: login and create server session.
+Request JSON:
 {
-  "loginId": "asd",
+  "loginId": "user1",
   "password": "1234"
 }
-
-현재 백엔드 응답 예시
+Response JSON:
 {
   "memberId": 1,
-  "loginId": "asd",
-  "nickname": "hong"
+  "loginId": "user1",
+  "nickName": "nickname1"
 }
 
-프론트 처리
-- 백엔드는 nickname으로 응답한다.
-- 프론트 내부에서는 nickName으로 정규화해서 사용한다.
+2. Members
 
-프론트 내부 사용자 상태 예시
+POST /api/members
+Purpose: signup.
+Request JSON:
+{
+  "loginId": "newuser",
+  "name": "Hong",
+  "password": "1234",
+  "nickname": "newnick",
+  "address": {
+    "city": "Seoul",
+    "street": "Road",
+    "zipcode": "00001"
+  }
+}
+Response: created member signup DTO.
+
+GET /api/members/me
+Purpose: get logged-in member info.
+Requires session.
+Response JSON:
 {
   "memberId": 1,
-  "loginId": "asd",
-  "nickName": "hong"
+  "loginId": "user1",
+  "nickName": "nickname1"
 }
 
-현재 주의점
-- 프론트의 본인 상품 판단은 member.nickName === item.nickName 으로 한다.
-- 따라서 로그인 응답 nickname과 상품 응답 nickName 이름 차이를 프론트에서 맞춰준다.
-
-============================================================
-3. 회원가입 화면
-============================================================
-
-화면 역할
-- 로그인 화면에서 계정 만들기를 눌렀을 때 표시한다.
-- 가입 성공 후 로그인 화면으로 돌아간다.
-
-호출 API
-POST /api/members/add
-
-요청 JSON
+PATCH /api/members/me
+Purpose: update logged-in member info.
+Requires session.
+Request JSON:
 {
-  "loginId": "newuser",
-  "name": "홍길동",
-  "password": "1234",
-  "nickname": "hong"
+  "name": "New Name",
+  "password": "5678",
+  "nickname": "newnick",
+  "address": {
+    "city": "Seoul",
+    "street": "New Road",
+    "zipcode": "00002"
+  }
 }
+Response: updated member DTO.
 
-현재 백엔드 응답 예시
+GET /api/members/{memberId}/shop
+Purpose: get public shop info for a member.
+Response JSON:
 {
-  "loginId": "newuser",
-  "name": "홍길동",
-  "password": "1234",
-  "nickname": "hong"
+  "loginId": "user1",
+  "nickName": "nickname1",
+  "name": "member1",
+  "itemList": []
 }
 
-응답 상태
-- 성공: 201 Created
-- 중복 회원: 409 Conflict 예상
+3. Items
 
-현재 주의점
-- 응답에 memberId는 포함되지 않는다.
-- 비밀번호가 응답으로 다시 내려온다. 실제 서비스라면 응답에서 password는 제거하는 것이 좋다.
+GET /api/items?page=0&size=10
+Purpose: get item slice for list/infinite scroll.
+Response JSON:
+{
+  "list": [
+    {
+      "id": 1,
+      "name": "item1",
+      "description": "description1",
+      "price": 1100,
+      "status": "SELLING",
+      "category": "OUTER",
+      "nickName": "nickname1",
+      "uploadFileDto": {
+        "itemImageId": 1,
+        "originalFilename": "item1-image1.jpg",
+        "storedFileName": "stored-item1-image1.jpg"
+      }
+    }
+  ],
+  "hasNext": true
+}
 
-============================================================
-4. 상품 상세 페이지
-============================================================
-
-화면 역할
-- 상품 카드를 눌렀을 때 표시한다.
-- 상품 이미지, 이름, 가격, 설명, 판매자, 상태를 보여준다.
-- 로그인 사용자와 판매자가 같으면 수정하기/삭제하기 버튼을 보여준다.
-- 다르면 구매 문의 또는 로그인하고 문의하기 버튼을 보여준다.
-
-호출 API
 GET /api/items/{itemId}
-
-요청 Body
-없음
-
-현재 백엔드 응답 예시
+Purpose: get item detail.
+Response JSON:
 {
+  "id": 1,
   "name": "item1",
-  "description": "good",
-  "price": 10000,
+  "description": "description1",
+  "price": 1100,
   "status": "SELLING",
-  "nickName": "hong"
+  "category": "OUTER",
+  "nickName": "nickname1",
+  "itemImages": [
+    {
+      "itemImageId": 1,
+      "originalFilename": "item1-image1.jpg",
+      "storedFileName": "stored-item1-image1.jpg"
+    }
+  ]
 }
 
-프론트에서 사용하는 필드
-- itemId: 수정/삭제 요청에 필요
-- name
-- description
-- price
-- status
-- nickName
-
-현재 주의점
-- 현재 상세 응답에도 itemId가 없다.
-- 프론트에서 상세 페이지 수정/삭제를 안정적으로 하려면 itemId가 필요하다.
-
-프론트에서 기대하는 권장 응답
-{
-  "itemId": 1,
-  "name": "item1",
-  "description": "good",
-  "price": 10000,
-  "status": "SELLING",
-  "nickName": "hong"
-}
-
-본인 상품 판단 로직
-로그인 사용자 닉네임 === 상품 판매자 닉네임
-예: member.nickName === item.nickName
-
-============================================================
-5. 상품 등록 화면
-============================================================
-
-화면 역할
-- 네비게이션 바의 Sell 버튼을 눌렀을 때 표시한다.
-- 로그인하지 않은 상태면 로그인 화면으로 이동한다.
-- 로그인된 상태에서 상품을 등록한다.
-
-호출 API
 POST /api/items
-
-필수 조건
-- 로그인 세션 필요
-- fetch credentials: "include" 필요
-
-현재 프론트 요청 JSON
+Purpose: create item.
+Requires session.
+Content-Type: multipart/form-data
+Parts:
+- itemSaveDto: application/json
+- multipartFiles: image files
+itemSaveDto JSON:
 {
-  "name": "상품명",
-  "description": "상품 설명",
+  "name": "New Item",
+  "description": "description",
   "price": 10000,
-  "status": "SELLING",
-  "category": "All",
-  "imageUrl": "https://..."
+  "category": "OUTER"
 }
 
-현재 백엔드가 실제로 사용하는 필드
-{
-  "name": "상품명",
-  "description": "상품 설명",
-  "price": 10000
-}
-
-현재 백엔드 응답 예시
-{
-  "itemId": 3,
-  "name": "상품명",
-  "description": "상품 설명",
-  "price": 10000
-}
-
-프론트 처리
-- 등록 응답에 nickName이 없으므로, 현재 로그인 사용자 nickName을 붙여서 상세 화면에 표시한다.
-- 등록 응답에 status가 없으면 프론트에서 SELLING 기본값을 사용한다.
-
-현재 주의점
-- 백엔드는 category, imageUrl, status를 저장하지 않는다.
-- 프론트 화면에는 category, imageUrl 입력 UI가 있지만 현재 백엔드 저장 대상은 아니다.
-- 실제 백엔드 기준 상품 등록에 필요한 값은 name, description, price다.
-
-============================================================
-6. 상품 수정 화면
-============================================================
-
-화면 역할
-- 상세 페이지에서 로그인 사용자와 판매자가 같을 때만 수정하기 버튼을 보여준다.
-- 수정 화면에서 상품명, 가격, 설명, 상태 등을 수정한다.
-
-호출 API
 PATCH /api/items/{itemId}
-
-필수 조건
-- itemId 필요
-- 현재 프론트 권한 체크는 닉네임 비교로 한다.
-
-현재 프론트 요청 JSON
+Purpose: update item.
+Requires session and owner permission.
+Content-Type: multipart/form-data
+Parts:
+- itemUpdateDto: application/json
+- multipartFiles: optional image files
+itemUpdateDto JSON:
 {
-  "name": "수정된 상품명",
-  "description": "수정된 설명",
+  "name": "Updated Item",
+  "description": "updated",
   "price": 12000,
   "status": "RESERVED",
-  "category": "Outer",
-  "imageUrl": "https://..."
+  "deletedFileIds": [1, 2]
 }
 
-현재 백엔드가 실제로 사용하는 필드
-{
-  "name": "수정된 상품명",
-  "description": "수정된 설명",
-  "price": 12000,
-  "status": "RESERVED"
-}
+DELETE /api/items/{itemId}
+Purpose: delete item.
+Requires session and owner permission.
+Response: 200 OK text response.
 
-현재 백엔드 응답 예시
-{
-  "name": "수정된 상품명",
-  "description": "수정된 설명",
-  "price": 12000,
-  "status": "RESERVED",
-  "nickName": "hong"
-}
+4. Images
 
-현재 주의점
-- 백엔드 응답에 itemId가 없다.
-- category, imageUrl은 현재 백엔드 수정 대상이 아니다.
-- 서버에서도 작성자 권한 검사를 하는 것이 안전하다. 현재 프론트에서만 닉네임으로 버튼 노출 여부를 판단한다.
-
-============================================================
-7. 상품 삭제 동작
-============================================================
-
-화면 역할
-- 상세 페이지에서 로그인 사용자와 판매자가 같을 때만 삭제하기 버튼을 보여준다.
-
-호출 API
-POST /api/items/{itemId}/delete
-
-요청 Body
-없음
-
-프론트 기대 응답
-- 성공 시 200 또는 204
-- 삭제 후 목록 페이지로 이동
-
-현재 백엔드 구현 상태
-@PostMapping("/items/{itemId}/delete")
-public String delete(@PathVariable Long itemId) {
-    // TODO: Call itemService.delete() and redirect to item list.
-    return "redirect:/items";
-}
-
-현재 주의점
-- 현재 컨트롤러는 itemService.delete(itemId)를 호출하지 않는다.
-- 즉, 프론트에서 삭제 요청을 보내도 실제 DB 삭제가 되지 않는다.
-- RestController에서 문자열 "redirect:/items"가 응답 바디로 내려올 수 있다.
-
-권장 백엔드 응답 형태
-- 삭제 성공: 204 No Content
-- 권한 없음: 403 Forbidden
-- 상품 없음: 404 Not Found
-
-============================================================
-8. 프론트 화면 이동 이름 정리
-============================================================
-
-프론트 내부 route 상태
-- home: 상품 목록 화면
-- auth: 로그인/회원가입 화면
-- detail: 상품 상세 화면
-- new: 상품 등록 화면
-- edit: 상품 수정 화면
-
-주의
-- 이 route 이름들은 백엔드 URL이 아니다.
-- 실제 API URL은 항상 /api로 시작한다.
-
-============================================================
-9. 현재 테스트로 확인한 실제 동작
-============================================================
-
-확인한 API
-- GET /api/items: 200 OK
-- POST /api/login: 200 OK
-- POST /api/items: 201 Created
-- Vite proxy /api -> localhost:8080 정상 전달 확인
-
-확인한 프론트 동작
-- 실제 백엔드 목록이 화면에 표시된다.
-- 로그인 성공 후 @hong 표시가 된다.
-- 상품 등록 시 백엔드로 JSON이 넘어간다.
-- 등록 후 상세 화면으로 이동한다.
-- 로그인 사용자와 판매자 닉네임이 같으면 수정하기/삭제하기 버튼이 보인다.
-
-============================================================
-10. 백엔드와 프론트 사이에서 맞추면 좋은 부분
-============================================================
-
-1) ItemDto 응답에 itemId 추가 권장
-목록, 상세, 수정 응답 모두 itemId가 있으면 프론트가 안정적으로 동작한다.
-
-2) 로그인 응답 필드명 통일 권장
-현재 로그인 응답: nickname
-상품 응답: nickName
-둘 중 하나로 통일하면 프론트 정규화 코드가 줄어든다.
-
-3) 상품 등록 응답에 status, nickName 추가 권장
-등록 직후 상세 화면에서 별도 보정 없이 바로 표시할 수 있다.
-
-4) 삭제 API 실제 삭제 처리 필요
-itemService.delete(itemId)를 호출하고 204 No Content를 반환하는 방식이 REST API에 더 잘 맞다.
-
-5) 서버 권한 검사 권장
-수정/삭제 권한은 프론트 버튼 노출만으로는 부족하다.
-서버에서도 로그인 사용자와 상품 판매자가 같은지 확인하는 것이 좋다.
+GET /api/images/{storedFilename}
+Purpose: load item image file.
+Example:
+GET /api/images/stored-item1-image1.jpg
