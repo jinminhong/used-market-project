@@ -1,5 +1,6 @@
 package com.side.project.domain.member;
 
+import com.side.project.domain.member.memberdto.MemberInfoDto;
 import com.side.project.domain.member.memberdto.ShopInfoDto;
 import com.side.project.domain.member.memberdto.MemberSaveDto;
 import com.side.project.domain.member.memberdto.MemberUpdateDto;
@@ -25,8 +26,8 @@ public class MemberController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> getMyInfo(@Login LoginMember loginMember) {
-        LoginMember myInfo = memberService.getMyInfo(loginMember.getMemberId());
+    public ResponseEntity<MemberInfoDto> getMyInfo(@Login LoginMember loginMember) {
+        MemberInfoDto myInfo = memberService.getMyInfo(loginMember.getMemberId());
         return ResponseEntity.status(HttpStatus.OK).body(myInfo);
     }
 

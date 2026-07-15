@@ -1,0 +1,245 @@
+중고거래 플랫폼 백엔드 확장 로드맵
+(채팅 / 구매 트랜잭션 / 구매 과정 엔티티 설계 / 검색)
+작성일: 2026-07-16
+
+
+================================================================
+현재 상태에서 아쉬운 점 (구현 시작 전에 인지해야 할 기존 공백)
+================================================================
+
+1. Item 엔티티에 구매자(buyer) 개념이 전혀 없음
+   - Item.java에는 member(판매자)만 있고 buyer 필드/연관관계가 없음
+   - status를 SOLD로 바꿔도 "누가 샀는지" 추적이 불가능
+   - assignSeller()만 있고 assignBuyer() 유사 메서드 없음
+
+2. 상태 변경 전용 API가 없음
+   - PATCH /api/items/{id} (일반 부분수정)에 status 필드가 그대로 섞여서 처리됨
+   - 트랜잭션 개념 없이 아무나(판매자 권한만 있으면) status를 SOLD/RESERVED로
+     바로 바꿔버릴 수 있어서, Transaction 엔티티를 도입해도 이 경로를 막지
+     않으면 정합성이 깨짐
+
+3. 거래 이력을 남길 곳이 없음
+   - 구매 요청/예약/거래완료/취소 같은 생애주기, 합의된 금액(가격 협상 결과),
+     거래 일시 등을 저장할 엔티티가 전혀 없음
+   - 지금 구조로는 예약 취소 후 재예약 같은 히스토리도 남길 수 없음
+
+4. 채팅/검색 관련 코드, 엔티티, 의존성이 전혀 없음
+   - build.gradle에 WebSocket/STOMP, Redis, Elasticsearch 등 관련 의존성 없음
+   - QueryDSL(querydsl-jpa 5.1.0 jakarta)은 이미 추가되어 있어서 검색 구현 시
+     바로 활용 가능 (신규 의존성 불필요)
+
+5. LoginCheckInterceptor의 인증 우회 로직이 정교하지 않음
+   - method.equals("GET") && requestURI.contains("items") 라는 "문자열 포함"
+     검사로 인증을 우회시킴 (경로 패턴 매칭이 아님)
+   - 새 도메인 API 경로 이름에 우연히 "items"라는 글자가 들어가면
+     로그인 없이 통과되어버릴 위험이 있음
+   - 예: 나중에 /api/items/{id}/transactions 같은 하위 경로를 GET으로
+     만들면 의도치 않게 공개됨
+
+6. GlobalExceptionHandler가 아직 얕음
+   - 도메인 예외 1개당 @ExceptionHandler 1개, 상태코드 고정 매핑 방식
+   - 현재 409 Conflict는 DuplicateMemberException 하나뿐 (상태전이 위반
+     같은 케이스를 위한 409가 없음)
+   - "로그인은 했지만 권한 없음"(403) 개념이 아예 없음 (지금은 401만 존재)
+   - 새 도메인(Transaction, Chat) 추가 시 이 패턴을 그대로 따라 예외 클래스를
+     추가해야 함
+
+7. Item.status(SELLING/RESERVED/SOLD)와 향후 만들 Transaction.status를
+   억지로 하나로 합치려 하면 안 됨
+   - Item.status = "상품 카탈로그 뷰에 보여지는 상태"
+   - Transaction.status = "개별 거래 건의 생애주기"
+   - 역할을 분리해서 설계할 것
+
+
+================================================================
+확정된 설계 방향 (논의 결과)
+================================================================
+
+- 구현 순서: 엔티티 설계 -> 트랜잭션 -> 검색 -> 채팅
+  (채팅방/거래가 무엇에 귀속되는지부터 정해야 하고, 채팅이 WebSocket 인증
+   연동 등 인프라 리스크가 가장 크므로 마지막 순서로 미룸)
+
+- 구매 과정은 Item에 buyer 필드만 추가하는 방식이 아니라 별도의
+  Transaction 엔티티로 모델링
+  (거래 이력 보존, 합의금액 분리, 채팅방과의 연결점 확보를 위해)
+  Member는 셀러도 되고 구매자도 될 수 있는 동일 엔티티이므로 별도의
+  Buyer/Seller 서브타입은 만들지 않음
+
+- 채팅은 MVP 없이 처음부터 WebSocket/STOMP 실시간 채팅으로 구현
+
+
+================================================================
+단계 1 - 구매 과정 엔티티 설계
+================================================================
+
+목표: 이후 단계(트랜잭션 로직, 채팅)가 딛고 설 스키마를 먼저 확정한다.
+
+[신규 엔티티]
+
+Transaction (domain/transaction 패키지 신설, 기존 domain/item 패턴을 그대로
+따름: Entity / *Controller / *Service / Repository + *dto/ 서브패키지)
+  - id
+  - item          (@ManyToOne)
+  - seller        (@ManyToOne Member)
+  - buyer         (@ManyToOne Member)
+  - agreedPrice   (Integer, 상품 정가와 별도로 협상된 금액)
+  - status        (TransactionStatus enum:
+                    REQUESTED  구매 요청/예약 요청
+                    RESERVED   판매자 승인
+                    COMPLETED  거래완료
+                    CANCELLED  취소)
+  - createdDate
+  - completedDate
+
+ChatRoom (domain/chat 패키지, 스키마만 이 단계에서 설계 - 실제 구현은 4단계)
+  - id
+  - item   (@ManyToOne)
+  - seller (@ManyToOne Member)
+  - buyer  (@ManyToOne Member)
+  - createdDate
+  - (item_id, buyer_id) 조합에 유니크 제약을 걸어서 같은 상품에 대해 같은
+    구매자가 채팅방을 중복 생성하지 않도록 함
+  - ChatRoom은 Transaction과 독립적으로 생성 가능 (구매자가 "채팅하기"만
+    눌러도 방은 생김). Transaction이 시작되면 선택적으로 어느 채팅방에서
+    비롯됐는지 참조만 걸어둘 수 있음 (필수 아님)
+
+ChatMessage (4단계에서 구현)
+  - id
+  - chatRoom (@ManyToOne)
+  - sender   (@ManyToOne Member)
+  - content
+  - sentAt
+
+[기존 코드에서 손봐야 할 부분]
+
+- ItemController / ItemService의 updateItem 경로(PATCH /api/items/{id})가
+  status 필드를 그대로 받아 임의로 바꿀 수 있음. Transaction 도입 후에는
+  이 경로로 상태가 바뀌면 정합성이 깨지므로, ItemUpdateDto에서 status
+  필드를 제거하거나 서비스 레이어에서 이 경로로는 상태 변경을 막고
+  반드시 Transaction API를 통해서만 전이되게 강제해야 함
+
+- GlobalExceptionHandler: 기존 패턴을 따라 TransactionException 추가.
+  상태전이 위반(예: 이미 RESERVED인 상품에 재예약 시도) 케이스를 위한
+  409 매핑 추가 필요
+
+
+================================================================
+단계 2 - 구매 트랜잭션 상태전이 로직
+================================================================
+
+목표: 순수 백엔드 상태머신으로, 프론트/실시간 없이 검증 가능한 이 단계를
+채팅보다 먼저 완성한다.
+
+[API] (기존 ItemController / MemberController 패턴 참고)
+
+POST /api/items/{itemId}/transactions
+  - 구매 요청(예약), 로그인 필요(@Login)
+  - Item.status == SELLING 일 때만 허용 -> Transaction(REQUESTED) 생성
+
+PATCH /api/transactions/{transactionId}
+  - 상태 전이
+    판매자 승인       -> RESERVED  & Item.status = RESERVED
+    거래완료          -> COMPLETED & Item.status = SOLD & completedDate 기록
+    취소              -> CANCELLED & Item.status = SELLING 복귀
+  - 요청자가 seller/buyer 중 해당 액션의 권한을 가진 쪽인지 검증
+
+GET /api/transactions/me?role=buyer|seller
+  - 내 구매/판매 거래 목록
+
+[검증 규칙]
+
+- 상태 전이는 TransactionStatus의 정해진 경로
+  (REQUESTED -> RESERVED -> COMPLETED, 언제든 -> CANCELLED)만 허용하고
+  역행/스킵은 TransactionException + 409로 응답
+- 같은 @Transactional 경계 안에서 Item.status도 함께 갱신
+  (이 프로젝트 규모에서는 별도 도메인 이벤트 없이 서비스 메서드 내
+   직접 호출로 충분)
+
+
+================================================================
+단계 3 - 검색
+================================================================
+
+목표: 이미 의존성이 있는 QueryDSL(querydsl-jpa 5.1.0 jakarta)만으로 구현.
+      Elasticsearch는 개인 사이드 프로젝트 규모에 오버엔지니어링이므로 불필요.
+
+- ItemRepositoryCustom + ItemRepositoryImpl (QueryDSL BooleanBuilder /
+  BooleanExpression) 추가, 기존 ItemRepository가 상속
+- GET /api/items 쿼리 파라미터 확장:
+    keyword   (name LIKE)
+    category
+    minPrice / maxPrice
+    status
+  기존 { list, hasNext } Slice 응답 포맷은 그대로 유지
+- 2단계에서 만든 Transaction / Item.status를 활용해 "판매완료 숨기기" 같은
+  필터 옵션 추가 가능
+- ItemService.findItemSlice를 확장하거나 QueryDSL 기반 메서드로 교체
+
+
+================================================================
+단계 4 - 채팅 (WebSocket/STOMP)
+================================================================
+
+목표: 1단계에서 설계해둔 ChatRoom/ChatMessage 스키마를 실제로 구현하고,
+      실시간 전송 계층을 얹는다.
+
+[신규 의존성 및 설정]
+
+- build.gradle에 spring-boot-starter-websocket 추가
+- WebSocketConfig (@Configuration + @EnableWebSocketMessageBroker):
+  STOMP 엔드포인트 등록, 메시지 브로커 설정
+- *** 이 단계의 핵심 리스크: 세션 인증 연동 ***
+  기존 LoginCheckInterceptor(HandlerInterceptor)는 WebSocket 핸드셰이크에
+  재사용 불가. 별도의 HandshakeInterceptor를 만들어 HTTP 세션의
+  LoginMember를 WebSocket 세션 attribute로 복사하고, 없으면 핸드셰이크를
+  거부해야 함
+
+[API]
+
+POST /api/items/{itemId}/chatrooms
+  - 채팅방 생성/조회 (이미 있으면 기존 방 반환), 로그인 필요
+
+STOMP:
+  /pub/chat/message        (발행)
+  /sub/chat/room/{roomId}  (구독)
+  메시지 수신 시 ChatMessage DB 저장 + 브로드캐스트
+
+GET /api/chatrooms/me
+GET /api/chatrooms/{roomId}/messages
+  - 채팅방 목록/이력 REST 조회 (기존 REST 패턴 재사용)
+
+[기존 코드에서 손봐야 할 부분]
+
+- LoginCheckInterceptor의 substring 체크 문제 (위 "아쉬운 점 5"번과 동일)
+  -> 신규 API는 이름에 "items"가 섞이지 않게 짓거나(/api/transactions,
+     /api/chat-rooms), 이 기회에 AntPathMatcher 기반 화이트리스트로 교체 권장
+- GlobalExceptionHandler에 "로그인은 했지만 이 채팅방/거래에 대한 권한 없음"
+  케이스를 위한 403 개념 추가 필요 (현재 401만 존재)
+
+
+================================================================
+검증 방법 (각 단계 구현 후 확인용)
+================================================================
+
+앱 구동: .\gradlew.bat bootRun (+ H2 TCP 서버 별도 기동 필요)
+ddl-auto=create 라서 재시작마다 스키마가 초기화되므로 H2 콘솔로
+테이블 구조를 바로바로 확인 가능
+
+- 단계 1 (엔티티): 앱 부팅 후 H2 콘솔에서 TRANSACTION, CHAT_ROOM,
+  CHAT_MESSAGE 테이블이 의도한 컬럼/FK로 생성됐는지 확인
+
+- 단계 2 (트랜잭션): Postman/curl로
+  로그인 -> 상품 예약 요청 -> 상태 전이 API 호출
+  -> Item.status와 Transaction.status가 함께 바뀌는지 확인
+  -> 잘못된 순서로 전이 시도 시 409가 오는지 확인
+
+- 단계 3 (검색): GET /api/items?keyword=...&category=...&minPrice=...
+  조합별로 curl/Postman 응답 확인
+  기존 무한스크롤 프론트(frontend/src/pages)가 파라미터 없이도 여전히
+  동작하는지 회귀 확인
+
+- 단계 4 (채팅): 브라우저 기반 STOMP 테스트 클라이언트(stomp.js) 또는
+  Postman의 WebSocket 요청 기능으로
+  -> CONNECT 시 세션 쿠키 없이 거부되는지 확인
+  -> 두 개의 클라이언트로 방을 열어 실시간 메시지 송수신 및 DB 저장이
+     되는지 확인

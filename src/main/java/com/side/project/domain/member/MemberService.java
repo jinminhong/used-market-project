@@ -1,6 +1,7 @@
 package com.side.project.domain.member;
 
 import com.side.project.domain.item.itemdto.ItemResponseDto;
+import com.side.project.domain.member.memberdto.MemberInfoDto;
 import com.side.project.domain.member.memberdto.ShopInfoDto;
 import com.side.project.domain.member.memberdto.MemberSaveDto;
 import com.side.project.domain.member.memberdto.MemberUpdateDto;
@@ -53,9 +54,9 @@ public class MemberService {
         return memberRepository.findAll();
     }
 
-    public LoginMember getMyInfo(Long memberId) {
+    public MemberInfoDto getMyInfo(Long memberId) {
         return findById(memberId)
-               .map(member -> new LoginMember(member.getId(), member.getLoginId(), member.getNickName()))
+               .map(member -> new MemberInfoDto(member.getId(), member.getLoginId(), member.getNickName(), member.getName(), member.getAddress()))
                .orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
     }
 
@@ -77,6 +78,7 @@ public class MemberService {
             throw new UnauthorizedException("회원정보가 맞지 않습니다.");
         }
         memberRepository.findByNickName(memberUpdateDto.getNickname())
+                .filter(existing -> !existing.getId().equals(member.getId()))
                 .ifPresent(existing -> {
                     throw new DuplicateMemberException("이미 사용 중인 닉네임입니다.");
                 });
