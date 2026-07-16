@@ -1,10 +1,8 @@
 package com.side.project.domain.item;
 
 import com.side.project.domain.item.itemdto.*;
-import com.side.project.domain.member.MemberService;
 import com.side.project.web.argumentresolver.Login;
 import com.side.project.web.login.LoginMember;
-import com.side.project.web.login.LoginService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -26,8 +24,9 @@ public class ItemController {
 
     @GetMapping("/items")
     public ResponseEntity<PageResponseDto> items(@RequestParam(defaultValue = "0") int page,
-                                                 @RequestParam(defaultValue = "10") int size) {
-        PageResponseDto itemSlice = itemService.findItemSlice(page, size);
+                                                 @RequestParam(defaultValue = "10") int size,
+                                                 @ModelAttribute ItemSearchCondition condition) {
+        PageResponseDto itemSlice = itemService.searchItems(condition, page, size);
         return ResponseEntity.status(HttpStatus.OK).body(itemSlice);
     }
 

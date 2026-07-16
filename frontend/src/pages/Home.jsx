@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
@@ -30,6 +30,7 @@ export default function Home() {
   const inFlightItemRequestRef = useRef("");
   const loadedItemPagesRef = useRef(new Set());
   const searchInputRef = useRef(null);
+  const isFirstFilterRunRef = useRef(true);
 
   async function loadItems(page = 0, append = false) {
     const size = 10;
@@ -44,7 +45,7 @@ export default function Home() {
     else setLoading(true);
 
     try {
-      const data = await api.listItems(page, size);
+      const data = await api.listItems(page, size, { keyword: search, category });
       const { list, hasNext, nextPage } = readItemSlice(data, page, size);
       const normalizedItems = list.map((item, index) => normalizeItem(item, page * size + index + 1));
       let addedCount = normalizedItems.length;
@@ -80,6 +81,22 @@ export default function Home() {
   }, [api]);
 
   useEffect(() => {
+    if (isFirstFilterRunRef.current) {
+      isFirstFilterRunRef.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      inFlightItemRequestRef.current = "";
+      loadedItemPagesRef.current = new Set();
+      setItemPage(0);
+      setHasNextItems(true);
+      loadItems(0, false);
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [category, search]);
+
+  useEffect(() => {
     function handleScroll() {
       const scrollBottom = window.innerHeight + window.scrollY;
       const documentHeight = document.documentElement.scrollHeight;
@@ -103,14 +120,6 @@ export default function Home() {
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const visibleItems = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-    return items.filter((item) => {
-      return (category === "All" || item.category === category) &&
-        (!keyword || `${item.name} ${item.description} ${item.nickName}`.toLowerCase().includes(keyword));
-    });
-  }, [items, category, search]);
 
   function updateParam(key, value) {
     const next = new URLSearchParams(searchParams);
@@ -141,11 +150,11 @@ export default function Home() {
         </div>
       </section>
       <section className="product-grid">
-        {visibleItems.map((item, index) => (
+        {items.map((item, index) => (
           <ItemCard key={`${item.itemId ?? item.name}-${index}`} item={item} />
         ))}
       </section>
-      {visibleItems.length === 0 && <p className="quiet-message">조건에 맞는 상품이 없습니다.</p>}
+      {items.length === 0 && <p className="quiet-message">조건에 맞는 상품이 없습니다.</p>}
       {loadingMore && <p className="quiet-message">상품을 더 불러오는 중입니다.</p>}
       {!hasNextItems && items.length > 0 && <p className="quiet-message">마지막 상품까지 모두 봤습니다.</p>}
     </main>

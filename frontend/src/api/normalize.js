@@ -12,6 +12,10 @@ export function imageUrlFromUploadFile(uploadFile) {
   return storedFileName ? `/api/images/${encodeURIComponent(storedFileName)}` : "";
 }
 
+export function imageUrlFromThumbnail(thumbnailFilename) {
+  return thumbnailFilename ? `/api/images/${encodeURIComponent(thumbnailFilename)}` : "";
+}
+
 export function normalizeMember(member) {
   if (!member) return null;
   return {
@@ -34,7 +38,7 @@ export function normalizeItem(item, fallbackId) {
     nickName: item.nickName ?? item.nickname ?? "",
     category: item.category ?? "ETC",
     itemImages,
-    imageUrl: item.imageUrl || imageUrlFromUploadFile(item.uploadFileDto) || imageUrlFromItemImages(itemImages) || defaultImage(),
+    imageUrl: item.imageUrl || imageUrlFromUploadFile(item.uploadFileDto) || imageUrlFromItemImages(itemImages) || imageUrlFromThumbnail(item.thumbnailFilename) || defaultImage(),
   };
 }
 

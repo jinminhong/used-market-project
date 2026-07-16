@@ -1,6 +1,7 @@
 package com.side.project.domain.item;
 
 import com.side.project.domain.item.itemdto.*;
+import com.side.project.domain.item.repository.ItemRepository;
 import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.itemimage.ItemImageRepository;
 import com.side.project.domain.itemimage.file.FileStore;
@@ -10,11 +11,9 @@ import com.side.project.domain.member.MemberRepository;
 import com.side.project.web.exception.login.UnauthorizedException;
 import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.item.ItemException;
-import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.login.LoginMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -124,14 +123,11 @@ public class ItemService {
         return new ItemDto(item);
     }
 
-    public PageResponseDto findItemSlice(int page , int size) {
+    public PageResponseDto searchItems(ItemSearchCondition condition, int page , int size) {
         PageRequest pageRequest = PageRequest.of(page, size);
-        Slice<Item> items = itemRepository.findAllSlice(pageRequest);
+        Slice<ItemListDto> items = itemRepository.searchItems(condition, pageRequest);
         boolean hasNext = items.hasNext();
-        List<ItemResponseDto> list = items.getContent()
-                .stream()
-                .map(ItemResponseDto::new)
-                .toList();
+        List<ItemListDto> list = items.getContent();
         return new PageResponseDto(list,hasNext);
     }
 }

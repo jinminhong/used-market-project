@@ -70,10 +70,25 @@ export function createApi(useMock) {
       const params = new URLSearchParams(path.split("?")[1] ?? "");
       const page = Number(params.get("page") ?? 0);
       const size = Number(params.get("size") ?? 10);
+      const keyword = (params.get("keyword") ?? "").trim().toLowerCase();
+      const category = params.get("category") ?? "";
+      const status = params.get("status") ?? "";
+      const priceGoe = params.get("priceGoe") ? Number(params.get("priceGoe")) : null;
+      const priceLoe = params.get("priceLoe") ? Number(params.get("priceLoe")) : null;
+
+      const filtered = mockItems.filter((item) => {
+        if (category && item.category !== category) return false;
+        if (status && item.status !== status) return false;
+        if (priceGoe != null && item.price < priceGoe) return false;
+        if (priceLoe != null && item.price > priceLoe) return false;
+        if (keyword && !`${item.name} ${item.description} ${item.nickName}`.toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+
       const start = page * size;
-      const items = mockItems.slice(start, start + size);
-      const hasNext = start + size < mockItems.length;
-      return { items, hasNext, page, size, nextPage: hasNext ? page + 1 : null };
+      const list = filtered.slice(start, start + size);
+      const hasNext = start + size < filtered.length;
+      return { list, hasNext, page, size, nextPage: hasNext ? page + 1 : null };
     }
     if (path === "/items" && method === "POST") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
@@ -120,7 +135,16 @@ export function createApi(useMock) {
     findShop: (memberId) => request(`/members/${memberId}/shop`),
     getMyInfo: () => request("/members/me"),
     updateMyInfo: (data) => request("/members/me", { method: "PATCH", body: JSON.stringify(data) }),
-    listItems: (page = 0, size = 10) => request(`/items?page=${page}&size=${size}`),
+    listItems: (page = 0, size = 10, condition = {}) => {
+      const params = new URLSearchParams({ page, size });
+      const { keyword, category, status, priceGoe, priceLoe } = condition;
+      if (keyword) params.set("keyword", keyword);
+      if (category && category !== "All") params.set("category", category);
+      if (status) params.set("status", status);
+      if (priceGoe != null) params.set("priceGoe", priceGoe);
+      if (priceLoe != null) params.set("priceLoe", priceLoe);
+      return request(`/items?${params.toString()}`);
+    },
     findItem: (id) => request(`/items/${id}`),
     createItem: (data) => useMock
       ? request("/items", { method: "POST", body: JSON.stringify({ ...data, imageUrl: data.imagePreview || data.imageUrl }) })

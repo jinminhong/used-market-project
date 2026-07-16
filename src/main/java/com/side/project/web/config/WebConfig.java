@@ -1,4 +1,4 @@
-package com.side.project.web;
+package com.side.project.web.config;
 
 import com.side.project.web.argumentresolver.LoginMemberArgumentResolver;
 import com.side.project.web.interceptor.LoginCheckInterceptor;

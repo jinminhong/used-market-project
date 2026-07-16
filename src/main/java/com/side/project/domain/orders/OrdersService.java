@@ -1,6 +1,6 @@
 package com.side.project.domain.orders;
 
-import com.side.project.domain.item.ItemRepository;
+import com.side.project.domain.item.repository.ItemRepository;
 import com.side.project.domain.member.MemberRepository;
 import com.side.project.domain.orders.ordersdto.OrdersResponseDto;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +16,9 @@ public class OrdersService {
     private final MemberRepository memberRepository;
     private final OrdersRepository ordersRepository;
 
-    @Transactional
-    public OrdersResponseDto orders() {
-
-    }
+//    @Transactional
+//    public OrdersResponseDto orders() {
+//
+//    }
 
 }
