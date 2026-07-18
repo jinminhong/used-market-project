@@ -84,20 +84,6 @@
   background: var(--color-accent);
   color: var(--color-accent-contrast);
 }
-.bottom-nav-fab {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #1a1a1a, #000000);
-  color: var(--color-accent-contrast);
-  box-shadow: var(--shadow-float);
-  transition: transform 150ms ease;
-}
-.bottom-nav-fab:active { transform: scale(0.94); }
-
 @media (max-width: 520px) {
   .site-header { padding: 0 16px; }
   .bottom-nav-wrap { width: calc(100% - 24px); bottom: var(--space-4); }

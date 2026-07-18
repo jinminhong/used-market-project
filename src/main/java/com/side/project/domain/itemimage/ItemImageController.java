@@ -27,7 +27,6 @@ public class ItemImageController {
 
     @GetMapping("/{storedFilename:.+}")
     public ResponseEntity<Resource> image(@PathVariable String storedFilename) throws IOException {
-        log.info("storedFilename ={}" , storedFilename);
         if (storedFilename.contains("..") || storedFilename.contains("/") || storedFilename.contains("\\")) {
             return ResponseEntity.badRequest().build();
         }

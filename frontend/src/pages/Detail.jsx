@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Heart } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeItem, imageUrlFromUploadFile, defaultImage } from "../api/normalize.js";
 import StatusPill from "../components/StatusPill.jsx";
@@ -12,12 +12,14 @@ export default function Detail() {
   const [item, setItem] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [wished, setWished] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setItem(null);
     setNotFound(false);
     setActiveImageIndex(0);
+    setWished(false);
 
     (async () => {
       try {
@@ -62,12 +64,31 @@ export default function Detail() {
     }, "상품이 삭제되었습니다.");
   }
 
-  function handleBuyerAction() {
+  function handleBuy() {
+    if (!member) {
+      navigate("/auth");
+      return;
+    }
+    navigate(`/items/${item.itemId}/checkout`);
+  }
+
+  function handleInquire() {
     if (!member) {
       navigate("/auth");
       return;
     }
     setNotice("준비 중인 기능입니다.");
+  }
+
+  async function handleToggleWishlist() {
+    if (!member) {
+      navigate("/auth");
+      return;
+    }
+    await run(async () => {
+      await api.toggleWishlist(item.itemId);
+      setWished((current) => !current);
+    });
   }
 
   return (
@@ -119,8 +140,19 @@ export default function Detail() {
             </div>
           ) : (
             <div className="buyer-actions">
-              <button type="button" onClick={handleBuyerAction}>{member ? "구매하기" : "로그인하고 구매하기"}</button>
-              <button type="button" onClick={handleBuyerAction}>{member ? "구매 문의하기" : "로그인하고 문의하기"}</button>
+              <button type="button" onClick={handleBuy}>{member ? "구매하기" : "로그인하고 구매하기"}</button>
+              <button type="button" onClick={handleInquire}>{member ? "구매 문의하기" : "로그인하고 문의하기"}</button>
+              <button
+                type="button"
+                className={`wishlist-toggle${wished ? " active" : ""}`}
+                onClick={handleToggleWishlist}
+                disabled={loading}
+                aria-pressed={wished}
+                aria-label={wished ? "찜 해제하기" : "찜하기"}
+              >
+                <Heart size={18} fill={wished ? "currentColor" : "none"} />
+                <span>{wished ? "찜 완료" : "찜하기"}</span>
+              </button>
             </div>
           )}
         </aside>

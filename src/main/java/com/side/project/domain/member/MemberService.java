@@ -31,14 +31,20 @@ public class MemberService {
     }
 
     private void checkDuplicate(MemberSaveDto memberForm) {
-        memberRepository.findByLoginId(memberForm.getLoginId())
-                .ifPresent(existing -> {
-                    throw new DuplicateMemberException("이미 사용 중인 로그인 ID입니다.");
-                });
-        memberRepository.findByNickName(memberForm.getNickname())
-                .ifPresent(existing -> {
-                    throw new DuplicateMemberException("이미 사용 중인 닉네임입니다.");
-                });
+        if (checkLoginIdDuplicate(memberForm.getLoginId())) {
+            throw new DuplicateMemberException("이미 사용 중인 로그인 ID입니다.");
+        }
+        if (checkNicknameDuplicate(memberForm.getNickname())) {
+            throw new DuplicateMemberException("이미 사용 중인 닉네임입니다.");
+        }
+    }
+
+    public boolean checkLoginIdDuplicate(String loginId) {
+        return memberRepository.existsByLoginId(loginId);
+    }
+
+    public boolean checkNicknameDuplicate(String nickname) {
+        return memberRepository.existsByNickName(nickname);
     }
 
     public Optional<Member> findById(Long memberId) {

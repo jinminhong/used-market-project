@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Store } from "lucide-react";
+import { ChevronLeft, Store, Package, ShoppingBag, Heart } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeMemberInfo } from "../api/normalize.js";
 
@@ -55,6 +55,20 @@ export default function Profile() {
         <Store size={20} />
         <span>내 상점으로 이동</span>
       </Link>
+      <nav className="profile-quick-links">
+        <Link to="/profile/sales">
+          <Package size={20} />
+          <span>판매내역</span>
+        </Link>
+        <Link to="/profile/purchases">
+          <ShoppingBag size={20} />
+          <span>구매내역</span>
+        </Link>
+        <Link to="/profile/wishlist">
+          <Heart size={20} />
+          <span>위시리스트</span>
+        </Link>
+      </nav>
       <section className="profile-detail-card">
         <dl>
           <div><dt>이름</dt><dd>{info.name}</dd></div>

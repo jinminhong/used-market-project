@@ -12,6 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/members")
 @RequiredArgsConstructor
@@ -36,6 +38,16 @@ public class MemberController {
                                           @RequestBody MemberUpdateDto memberUpdateDto) {
         MemberUpdateDto update = memberService.update(loginMember, memberUpdateDto);
         return ResponseEntity.ok(update);
+    }
+
+    @GetMapping("/check-id")
+    public ResponseEntity<Map<String, Boolean>> checkLoginId(@RequestParam String loginId) {
+        return ResponseEntity.ok(Map.of("duplicate", memberService.checkLoginIdDuplicate(loginId)));
+    }
+
+    @GetMapping("/check-nickname")
+    public ResponseEntity<Map<String, Boolean>> checkNickname(@RequestParam String nickname) {
+        return ResponseEntity.ok(Map.of("duplicate", memberService.checkNicknameDuplicate(nickname)));
     }
 
     @GetMapping("/{memberId}/shop")

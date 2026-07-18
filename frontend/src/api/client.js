@@ -25,6 +25,8 @@ export function buildItemFormData(data, dtoPartName, includeEmptyFilePart = fals
 export function createApi(useMock) {
   let mockItems = [...sampleItems];
   let mockMember = null;
+  let mockOrders = [];
+  let mockWishlist = [];
 
   async function request(path, options = {}) {
     const method = options.method || "GET";
@@ -54,6 +56,14 @@ export function createApi(useMock) {
       return mockMember;
     }
     if (path === "/members" && method === "POST") return body;
+    if (path.startsWith("/members/check-id") && method === "GET") {
+      const loginId = new URLSearchParams(path.split("?")[1] ?? "").get("loginId") ?? "";
+      return { duplicate: loginId === (mockMember?.loginId ?? "asd") };
+    }
+    if (path.startsWith("/members/check-nickname") && method === "GET") {
+      const nickname = new URLSearchParams(path.split("?")[1] ?? "").get("nickname") ?? "";
+      return { duplicate: mockItems.some((item) => item.nickName === nickname) };
+    }
     const shopMemberId = Number(path.match(/\/members\/(\d+)\/shop/)?.[1]);
     if (path.startsWith("/members/") && path.endsWith("/shop") && method === "GET") {
       const shopItems = mockItems.filter((item) => item.memberId === shopMemberId);
@@ -96,6 +106,64 @@ export function createApi(useMock) {
       mockItems = [item, ...mockItems];
       return item;
     }
+    if (path.startsWith("/orders/purchases") && method === "GET") {
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      const params = new URLSearchParams(path.split("?")[1] ?? "");
+      const page = Number(params.get("page") ?? 0);
+      const size = Number(params.get("size") ?? 10);
+      const purchases = mockOrders
+        .filter((order) => order.buyerId === mockMember.memberId)
+        .map((order) => ({
+          orderId: order.orderId,
+          itemId: order.item.itemId,
+          name: order.item.name,
+          description: order.item.description,
+          price: order.item.price,
+          status: order.item.status,
+          sellerNickName: order.sellerNickName,
+          imageUrl: order.item.imageUrl,
+          purchaseDate: order.createdDate,
+        }));
+      const start = page * size;
+      const list = purchases.slice(start, start + size);
+      const hasNext = start + size < purchases.length;
+      return { list, hasNext };
+    }
+    if (path === "/orders/sales" && method === "GET") {
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      return mockOrders.filter((order) => order.sellerId === mockMember.memberId);
+    }
+    const orderItemId = Number(path.match(/^\/orders\/(\d+)$/)?.[1]);
+    if (path.startsWith("/orders/") && method === "POST" && orderItemId) {
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      const target = mockItems.find((item) => item.itemId === orderItemId);
+      if (!target) throw new Error("상품을 찾을 수 없습니다.");
+      if (target.status !== "SELLING") throw new Error("이미 예약되었거나 판매 완료된 상품입니다.");
+      mockItems = mockItems.map((item) => item.itemId === orderItemId ? { ...item, status: "RESERVED" } : item);
+      const order = {
+        orderId: Date.now(),
+        buyerId: mockMember.memberId,
+        buyerNickName: mockMember.nickName,
+        sellerId: target.memberId,
+        sellerNickName: target.nickName,
+        item: { ...target, status: "RESERVED" },
+        orderStatus: "PAY_COMPLETED",
+        createdDate: new Date().toISOString(),
+      };
+      mockOrders = [order, ...mockOrders];
+      return order;
+    }
+    if (path === "/wishlist" && method === "GET") {
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      return mockItems.filter((item) => mockWishlist.includes(item.itemId));
+    }
+    const wishItemId = Number(path.match(/^\/wishlist\/(\d+)$/)?.[1]);
+    if (path.startsWith("/wishlist/") && method === "POST" && wishItemId) {
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      const wished = mockWishlist.includes(wishItemId);
+      mockWishlist = wished ? mockWishlist.filter((id) => id !== wishItemId) : [...mockWishlist, wishItemId];
+      return { itemId: wishItemId, wished: !wished };
+    }
     if (path === "/members/me" && method === "GET") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
       return {
@@ -132,6 +200,8 @@ export function createApi(useMock) {
   return {
     login: (data) => request("/login", { method: "POST", body: JSON.stringify(data) }),
     signup: (data) => request("/members", { method: "POST", body: JSON.stringify(data) }),
+    checkLoginId: (loginId) => request(`/members/check-id?loginId=${encodeURIComponent(loginId)}`),
+    checkNickname: (nickname) => request(`/members/check-nickname?nickname=${encodeURIComponent(nickname)}`),
     findShop: (memberId) => request(`/members/${memberId}/shop`),
     getMyInfo: () => request("/members/me"),
     updateMyInfo: (data) => request("/members/me", { method: "PATCH", body: JSON.stringify(data) }),
@@ -153,5 +223,10 @@ export function createApi(useMock) {
       ? request(`/items/${id}`, { method: "PATCH", body: JSON.stringify({ ...data, imageUrl: data.imagePreview || data.imageUrl }) })
       : request(`/items/${id}`, { method: "PATCH", body: buildItemFormData(data, "itemUpdateDto", true) }),
     deleteItem: (id) => request(`/items/${id}`, { method: "DELETE" }),
+    buyItem: (itemId) => request(`/orders/${itemId}`, { method: "POST" }),
+    listPurchases: (page = 0, size = 10) => request(`/orders/purchases?page=${page}&size=${size}`),
+    listSales: () => request("/orders/sales"),
+    listWishlist: () => request("/wishlist"),
+    toggleWishlist: (itemId) => request(`/wishlist/${itemId}`, { method: "POST" }),
   };
 }

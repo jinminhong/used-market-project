@@ -26,13 +26,12 @@ public class WebConfig implements WebMvcConfigurer {
                         "/api/login",
                         "/api/logout",
                         "/api/members",
+                        "/api/members/check-id",
+                        "/api/members/check-nickname",
+                        "/api/members/*/shop",
                         "/css/**",
                         "/error",
                         "/api/images/**"
                 );
-
-        // TODO:
-        // Add or remove paths while studying which pages require login.
-        // Example: allow /items for everyone, but require login for /items/add.
     }
 }

@@ -24,11 +24,16 @@ public class Orders extends BaseEntity {
     private Member buyer;
 
     @ManyToOne(fetch = LAZY)
-    @JoinColumn(nullable = false, name = "seller_id")
-    private Member seller;
-
-    @OneToOne
     @JoinColumn(name = "item_id")
     private Item item;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private OrderStatus orderStatus;
+
+    public void createOrders(Member buyer, Item item, OrderStatus orderStatus) {
+        this.buyer = buyer;
+        this.item = item;
+        this.orderStatus = orderStatus;
+    }
 }

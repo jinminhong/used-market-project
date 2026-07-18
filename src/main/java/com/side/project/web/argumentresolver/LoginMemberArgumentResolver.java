@@ -2,6 +2,7 @@ package com.side.project.web.argumentresolver;
 
 
 import com.side.project.web.SessionConst;
+import com.side.project.web.exception.login.UnauthorizedException;
 import com.side.project.web.login.LoginMember;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpSession;
@@ -35,9 +36,15 @@ public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolve
         HttpSession session = request.getSession(false);
 
         if(session == null) {
-            return null;
+            throw new UnauthorizedException("로그인이 필요합니다");
         }
 
-        return session.getAttribute(SessionConst.LOGIN_MEMBER);
+        Object loginMember = session.getAttribute(SessionConst.LOGIN_MEMBER);
+
+        if(loginMember == null) {
+            throw new UnauthorizedException("로그인이 필요합니다");
+        }
+
+        return loginMember;
     }
 }

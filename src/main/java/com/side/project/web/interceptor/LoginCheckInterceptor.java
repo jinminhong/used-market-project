@@ -19,7 +19,7 @@ public class LoginCheckInterceptor implements HandlerInterceptor {
         String method = request.getMethod();
         String requestURI = request.getRequestURI();
 
-        if (method.equals("GET") && requestURI.contains("items")){ //get으로 보낸 items는 실행되기 위해서
+        if (method.equals("GET") && requestURI.startsWith("/api/items")){ //get으로 보낸 상품 조회는 로그인 없이 허용
             return true;
         }
 

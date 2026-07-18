@@ -36,8 +36,6 @@ public class ItemController {
                                       @Login LoginMember loginMember) throws IOException {
         Long itemId = itemService.save(itemSaveDto, loginMember.getLoginId() ,multipartFiles);
         itemSaveDto.setItemId(itemId);
-
-
         return ResponseEntity.status(HttpStatus.CREATED).body(itemSaveDto);
     }
 

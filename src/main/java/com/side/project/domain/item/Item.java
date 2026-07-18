@@ -4,6 +4,7 @@ import com.side.project.domain.item.itemdto.ItemDto;
 import com.side.project.domain.item.itemdto.ItemUpdateDto;
 import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.member.Member;
+import com.side.project.domain.orders.Orders;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -42,6 +43,9 @@ public class Item {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(nullable = false, name = "members_id")
     private Member member;
+
+    @OneToMany(mappedBy = "item")
+    private List<Orders> orders;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "thumbnail_image_id")
@@ -104,5 +108,9 @@ public class Item {
             this.category = itemUpdateDto.getCategory();
         }
 
+    }
+
+    public void changeStatus(ItemStatus itemStatus){
+        this.status = itemStatus;
     }
 }

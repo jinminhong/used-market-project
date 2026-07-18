@@ -67,3 +67,32 @@ export function normalizeShop(shop) {
     items: (shop.itemList ?? shop.items ?? []).map((item, index) => normalizeItem(item, index + 1)),
   };
 }
+
+export function normalizePurchase(purchase) {
+  if (!purchase) return null;
+  return {
+    orderId: purchase.orderId ?? null,
+    purchaseDate: purchase.purchaseDate ?? null,
+    sellerNickName: purchase.sellerNickName ?? "",
+    item: {
+      itemId: purchase.itemId ?? null,
+      name: purchase.name ?? "이름 없는 상품",
+      description: purchase.description ?? "",
+      price: Number(purchase.price ?? 0),
+      status: purchase.status ?? "SOLD",
+      imageUrl: purchase.imageUrl || imageUrlFromThumbnail(purchase.thumbnailFilename) || defaultImage(),
+    },
+  };
+}
+
+export function normalizeOrder(order, fallbackId) {
+  if (!order) return null;
+  return {
+    orderId: order.orderId ?? order.id ?? fallbackId ?? null,
+    orderStatus: order.orderStatus ?? "PAY_COMPLETED",
+    createdDate: order.createdDate ?? order.createdAt ?? null,
+    item: normalizeItem(order.item ?? {}, order.itemId ?? fallbackId),
+    buyerNickName: order.buyerNickName ?? order.buyer?.nickName ?? "",
+    sellerNickName: order.sellerNickName ?? order.seller?.nickName ?? order.item?.nickName ?? "",
+  };
+}

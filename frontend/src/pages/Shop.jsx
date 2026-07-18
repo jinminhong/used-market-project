@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ChevronLeft } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ChevronLeft, Plus } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeShop } from "../api/normalize.js";
 import ItemCard from "../components/ItemCard.jsx";
 
 export default function Shop() {
   const { memberId } = useParams();
-  const { api, setNotice } = useSession();
+  const { api, member, setNotice } = useSession();
+  const navigate = useNavigate();
   const [shop, setShop] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const isOwnShop = Boolean(member) && member.memberId === Number(memberId);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +53,12 @@ export default function Shop() {
         <h1>@{shop.nickName}</h1>
         <span>{shop.items.length} items</span>
       </section>
+      {isOwnShop && (
+        <button type="button" className="shop-cta" onClick={() => navigate("/items/new")}>
+          <Plus size={20} />
+          <span>상품 등록</span>
+        </button>
+      )}
       <section className="product-grid">
         {shop.items.map((item, index) => (
           <ItemCard key={`${item.itemId ?? item.name}-${index}`} item={item} />

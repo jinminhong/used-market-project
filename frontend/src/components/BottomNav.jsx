@@ -1,9 +1,9 @@
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, Store, LogIn, LogOut, Plus } from "lucide-react";
+import { Home, Search, Store, LogIn, LogOut } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 
 export default function BottomNav() {
-  const { member, logout, setNotice } = useSession();
+  const { member, logout } = useSession();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -13,15 +13,6 @@ export default function BottomNav() {
   function handleAccountClick() {
     logout();
     navigate("/");
-  }
-
-  function handleSell() {
-    if (!member) {
-      setNotice("상품을 등록하려면 로그인해주세요.");
-      navigate("/auth");
-      return;
-    }
-    navigate("/items/new");
   }
 
   return (
@@ -51,9 +42,6 @@ export default function BottomNav() {
           </NavLink>
         )}
       </nav>
-      <button type="button" className="bottom-nav-fab" onClick={handleSell} aria-label="상품 등록">
-        <Plus size={24} />
-      </button>
     </div>
   );
 }

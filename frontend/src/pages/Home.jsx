@@ -30,7 +30,7 @@ export default function Home() {
   const inFlightItemRequestRef = useRef("");
   const loadedItemPagesRef = useRef(new Set());
   const searchInputRef = useRef(null);
-  const isFirstFilterRunRef = useRef(true);
+  const lastFilterRef = useRef({ category, search });
 
   async function loadItems(page = 0, append = false) {
     const size = 10;
@@ -81,10 +81,8 @@ export default function Home() {
   }, [api]);
 
   useEffect(() => {
-    if (isFirstFilterRunRef.current) {
-      isFirstFilterRunRef.current = false;
-      return;
-    }
+    if (lastFilterRef.current.category === category && lastFilterRef.current.search === search) return;
+    lastFilterRef.current = { category, search };
     const timer = setTimeout(() => {
       inFlightItemRequestRef.current = "";
       loadedItemPagesRef.current = new Set();
