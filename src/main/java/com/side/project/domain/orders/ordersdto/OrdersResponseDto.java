@@ -19,6 +19,7 @@ public class OrdersResponseDto {
     private String thumbnailFilename;
 
     private LocalDateTime purchaseDate;
+
     @QueryProjection
     public OrdersResponseDto(Long orderId, Long itemId, String name, String description, Integer price, ItemStatus status, String sellerNickName, String thumbnailFilename, LocalDateTime purchaseDate) {
         this.orderId = orderId;

@@ -6,10 +6,6 @@ import com.side.project.domain.item.ItemStatus;
 import com.side.project.domain.itemimage.file.UploadFileDto;
 import lombok.Data;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
-
 @Data
 public class ItemResponseDto {
 
@@ -31,7 +27,7 @@ public class ItemResponseDto {
         this.price = item.getPrice();
         this.status = item.getStatus();
         this.category = item.getCategory();
-        this.nickName = item.getMember().getNickName();
+        this.nickName = item.getSeller().getNickName();
         this.uploadFileDto = new UploadFileDto(item.getThumbnailImage().getId(),
                 item.getThumbnailImage().getOriginalFilename(),
                 item.getThumbnailImage().getStoredFilename());

@@ -82,7 +82,7 @@ public class ItemService {
     @Transactional
     public void delete(Long itemId , LoginMember loginMember) {
         Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
-        if (!item.getMember().getLoginId().equals(loginMember.getLoginId())) {
+        if (!item.getSeller().getLoginId().equals(loginMember.getLoginId())) {
             throw new UnauthorizedException("상품을 삭제할 권한이 없습니다");
         }
         itemRepository.delete(item);
@@ -93,7 +93,7 @@ public class ItemService {
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다. id=" + itemId));
 
-        if (!item.getMember().getLoginId().equals(loginId)) {
+        if (!item.getSeller().getLoginId().equals(loginId)) {
             throw new ItemException("상품을 수정할 권한이 없습니다");
         }
         List<Long> deletedFileIds = itemUpdateDto.getDeletedFileIds();

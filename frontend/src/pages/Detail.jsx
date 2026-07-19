@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Heart } from "lucide-react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeItem, imageUrlFromUploadFile, defaultImage } from "../api/normalize.js";
 import StatusPill from "../components/StatusPill.jsx";
+import { Button } from "../components/ui/button.jsx";
 
 export default function Detail() {
   const { itemId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { api, member, run, loading, setNotice } = useSession();
   const [item, setItem] = useState(null);
   const [notFound, setNotFound] = useState(false);
@@ -64,9 +66,13 @@ export default function Detail() {
     }, "상품이 삭제되었습니다.");
   }
 
+  function redirectToAuth() {
+    navigate(`/auth?next=${encodeURIComponent(location.pathname + location.search)}`);
+  }
+
   function handleBuy() {
     if (!member) {
-      navigate("/auth");
+      redirectToAuth();
       return;
     }
     navigate(`/items/${item.itemId}/checkout`);
@@ -74,20 +80,20 @@ export default function Detail() {
 
   function handleInquire() {
     if (!member) {
-      navigate("/auth");
+      redirectToAuth();
       return;
     }
     setNotice("준비 중인 기능입니다.");
   }
 
-  async function handleToggleWishlist() {
-    if (!member) {
-      navigate("/auth");
+  async function handleAddWishlist() {
+    if (!member || wished) {
+      if (!member) redirectToAuth();
       return;
     }
     await run(async () => {
-      await api.toggleWishlist(item.itemId);
-      setWished((current) => !current);
+      await api.addWishlist(item.itemId);
+      setWished(true);
     });
   }
 
@@ -100,8 +106,24 @@ export default function Detail() {
             <img src={slideImages[activeImageIndex]} alt="" />
             {slideImages.length > 1 && (
               <>
-                <button className="slide-button prev" type="button" onClick={() => moveSlide(-1)} aria-label="이전 이미지">‹</button>
-                <button className="slide-button next" type="button" onClick={() => moveSlide(1)} aria-label="다음 이미지">›</button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="slide-button prev rounded-full bg-white/90 hover:bg-white"
+                  onClick={() => moveSlide(-1)}
+                  aria-label="이전 이미지"
+                >
+                  <ChevronLeft />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="slide-button next rounded-full bg-white/90 hover:bg-white"
+                  onClick={() => moveSlide(1)}
+                  aria-label="다음 이미지"
+                >
+                  <ChevronRight />
+                </Button>
               </>
             )}
           </div>
@@ -135,24 +157,25 @@ export default function Detail() {
           <p>{item.description || "등록된 설명이 없습니다."}</p>
           {isOwner ? (
             <div className="owner-actions">
-              <button type="button" onClick={() => navigate(`/items/${item.itemId}/edit`)} disabled={!canMutate || loading}>수정하기</button>
-              <button className="danger" type="button" onClick={handleRemove} disabled={!canMutate || loading}>삭제하기</button>
+              <Button size="lg" variant="secondary" onClick={() => navigate(`/items/${item.itemId}/edit`)} disabled={!canMutate || loading}>수정하기</Button>
+              <Button size="lg" variant="destructive" onClick={handleRemove} disabled={!canMutate || loading}>삭제하기</Button>
             </div>
           ) : (
             <div className="buyer-actions">
-              <button type="button" onClick={handleBuy}>{member ? "구매하기" : "로그인하고 구매하기"}</button>
-              <button type="button" onClick={handleInquire}>{member ? "구매 문의하기" : "로그인하고 문의하기"}</button>
-              <button
-                type="button"
-                className={`wishlist-toggle${wished ? " active" : ""}`}
-                onClick={handleToggleWishlist}
-                disabled={loading}
+              <Button size="lg" onClick={handleBuy}>{member ? "구매하기" : "로그인하고 구매하기"}</Button>
+              <Button size="lg" variant="outline" onClick={handleInquire}>{member ? "구매 문의하기" : "로그인하고 문의하기"}</Button>
+              <Button
+                size="lg"
+                variant={wished ? "secondary" : "ghost"}
+                onClick={handleAddWishlist}
+                disabled={loading || wished}
                 aria-pressed={wished}
-                aria-label={wished ? "찜 해제하기" : "찜하기"}
+                aria-label={wished ? "찜한 상품" : "찜하기"}
+                className={wished ? "text-red-600" : undefined}
               >
                 <Heart size={18} fill={wished ? "currentColor" : "none"} />
                 <span>{wished ? "찜 완료" : "찜하기"}</span>
-              </button>
+              </Button>
             </div>
           )}
         </aside>

@@ -38,19 +38,8 @@
   position: absolute;
   left: 10px;
   top: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pill);
-  background: var(--color-status-selling-bg);
-  color: var(--color-status-selling-fg);
-  padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 800;
   box-shadow: var(--shadow-sm);
 }
-.status-pill.reserved { background: var(--color-status-reserved-bg); color: var(--color-status-reserved-fg); }
-.status-pill.sold { background: var(--color-status-sold-bg); color: var(--color-status-sold-fg); }
 .seller-line .status-pill { position: static; }
 
 .category-tabs { display: flex; gap: var(--space-2); overflow-x: auto; padding-bottom: 2px; }
@@ -91,28 +80,10 @@
 
 .quiet-message { padding: var(--space-8) 0; color: var(--color-text-muted); font-size: 13px; font-weight: 700; text-align: center; }
 
-.owner-actions button, .buyer-actions button, .profile-actions button, .form-panel button:not(.text-button) {
+.profile-actions button, .form-panel:not(.auth-card) button:not(.text-button) {
   min-height: 50px;
   border-radius: var(--radius-pill);
   background: linear-gradient(145deg, #1a1a1a, #000000);
   color: var(--color-accent-contrast);
   font-weight: 800;
-}
-.owner-actions .danger {
-  background: var(--color-surface);
-  color: var(--color-danger);
-  border: 1px solid var(--color-danger);
-}
-.buyer-actions .wishlist-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-}
-.buyer-actions .wishlist-toggle.active {
-  color: var(--color-danger);
-  border-color: var(--color-danger);
 }

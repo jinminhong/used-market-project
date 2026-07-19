@@ -1,6 +1,5 @@
 package com.side.project.domain.item;
 
-import com.side.project.domain.item.itemdto.ItemDto;
 import com.side.project.domain.item.itemdto.ItemUpdateDto;
 import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.member.Member;
@@ -42,7 +41,7 @@ public class Item {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(nullable = false, name = "members_id")
-    private Member member;
+    private Member seller;
 
     @OneToMany(mappedBy = "item")
     private List<Orders> orders;
@@ -73,18 +72,18 @@ public class Item {
     }
 
     public void assignSeller(Member member) {
-        this.member = member;
+        this.seller = member;
         member.getItemList().add(this);
     }
 
 
-    public Item(String name, String description, Integer price, ItemStatus status, Category category , Member member ) {
+    public Item(String name, String description, Integer price, ItemStatus status, Category category , Member seller) {
         this.name = name;
         this.description = description;
         this.price = price;
         this.status = status;
         this.category = category;
-        assignSeller(member);
+        assignSeller(seller);
     }
 
     public void updateItem(ItemUpdateDto itemUpdateDto){

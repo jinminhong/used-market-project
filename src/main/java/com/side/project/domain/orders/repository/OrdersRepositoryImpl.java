@@ -3,7 +3,7 @@ package com.side.project.domain.orders.repository;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.side.project.domain.orders.OrderStatus;
 import com.side.project.domain.orders.ordersdto.OrdersResponseDto;
-import com.side.project.domain.orders.ordersdto.QOrdersPurchasesDto;
+import com.side.project.domain.orders.ordersdto.QOrdersResponseDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -25,11 +25,11 @@ public class OrdersRepositoryImpl implements OrdersRepositoryCustom {
     public Slice<OrdersResponseDto> findAllPurchases(Long memberId, Pageable pageable) {
         int pageSize = pageable.getPageSize();
 
-        List<OrdersResponseDto> purchasesList = queryFactory.select(new QOrdersPurchasesDto(orders.id, orders.item.id, orders.item.name, orders.item.description, orders.item.price, orders.item.status, orders.item.member.nickName, orders.item.thumbnailImage.storedFilename, orders.lastModifiedDate))
+        List<OrdersResponseDto> purchasesList = queryFactory.select(new QOrdersResponseDto(orders.id, orders.item.id, orders.item.name, orders.item.description, orders.item.price, orders.item.status, orders.item.seller.nickName, orders.item.thumbnailImage.storedFilename, orders.lastModifiedDate))
                 .from(orders)
                 .join(orders.item, item)
                 .join(orders.item.thumbnailImage, itemImage)
-                .join(orders.item.member, member)
+                .join(orders.item.seller, member)
                 .where(orders.buyer.id.eq(memberId), orders.orderStatus.in(OrderStatus.COMPLETED, OrderStatus.PAY_COMPLETED))
                 .orderBy(orders.lastModifiedDate.desc())
                 .offset(pageable.getOffset())
@@ -48,12 +48,12 @@ public class OrdersRepositoryImpl implements OrdersRepositoryCustom {
     public Slice<OrdersResponseDto> findAllSales(Long memberId, Pageable pageable) {
         int pageSize = pageable.getPageSize();
 
-        List<OrdersResponseDto> salesList = queryFactory.select(new QOrdersPurchasesDto(orders.id, orders.item.id, orders.item.name, orders.item.description, orders.item.price, orders.item.status, orders.item.member.nickName, orders.item.thumbnailImage.storedFilename, orders.lastModifiedDate))
+        List<OrdersResponseDto> salesList = queryFactory.select(new QOrdersResponseDto(orders.id, orders.item.id, orders.item.name, orders.item.description, orders.item.price, orders.item.status, orders.item.seller.nickName, orders.item.thumbnailImage.storedFilename, orders.lastModifiedDate))
                 .from(orders)
                 .join(orders.item, item)
                 .join(orders.item.thumbnailImage, itemImage)
-                .join(orders.item.member, member)
-                .where(item.member.id.eq(memberId), orders.orderStatus.in(OrderStatus.COMPLETED, OrderStatus.PAY_COMPLETED))
+                .join(orders.item.seller, member)
+                .where(item.seller.id.eq(memberId), orders.orderStatus.in(OrderStatus.COMPLETED, OrderStatus.PAY_COMPLETED))
                 .orderBy(orders.lastModifiedDate.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize() + 1)

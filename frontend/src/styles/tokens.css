@@ -46,4 +46,26 @@
   --z-header: 30;
   --z-bottomnav: 40;
   --z-toast: 50;
+
+  /* shadcn/ui 컴포넌트용 변수 - 위 흑백 미니멀 톤에 맞춤 */
+  --background: 0 0% 100%;
+  --foreground: 0 0% 7%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 7%;
+  --primary: 0 0% 7%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 96%;
+  --secondary-foreground: 0 0% 7%;
+  --muted: 0 0% 96%;
+  --muted-foreground: 0 0% 42%;
+  --accent: 0 0% 96%;
+  --accent-foreground: 0 0% 7%;
+  --destructive: 0 64% 55%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 90%;
+  --input: 0 0% 90%;
+  --ring: 0 0% 7%;
+  --radius: 0.75rem;
 }

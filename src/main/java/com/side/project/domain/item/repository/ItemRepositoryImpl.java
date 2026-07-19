@@ -28,10 +28,10 @@ public class ItemRepositoryImpl implements ItemRepositoryCustom{
     public Slice<ItemListDto> searchItems(ItemSearchCondition condition , Pageable pageable) {
         int pageSize = pageable.getPageSize();
 
-        List<ItemListDto> itemList = queryFactory.select(new QItemListDto(item.id, item.member.id, item.name, item.description, item.price,
-                        item.status, item.category, item.member.nickName, item.thumbnailImage.storedFilename))
+        List<ItemListDto> itemList = queryFactory.select(new QItemListDto(item.id, item.seller.id, item.name, item.description, item.price,
+                        item.status, item.category, item.seller.nickName, item.thumbnailImage.storedFilename))
                 .from(item)
-                .join(item.member, member)
+                .join(item.seller, member)
                 .join(item.thumbnailImage)
                 .where(keywordLike(condition.getKeyword()),
                         categoryEq(condition.getCategory()),

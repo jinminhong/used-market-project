@@ -5,6 +5,7 @@ import { useSession } from "../context/SessionContext.jsx";
 import { normalizeItem } from "../api/normalize.js";
 import ItemCard from "../components/ItemCard.jsx";
 import CategoryTabs from "../components/CategoryTabs.jsx";
+import { Input } from "../components/ui/input.jsx";
 
 function readItemSlice(data, page, size) {
   const list = Array.isArray(data) ? data : data?.list ?? data?.items ?? data?.content ?? [];
@@ -139,7 +140,7 @@ export default function Home() {
         <CategoryTabs value={category} onChange={(name) => updateParam("category", name === "All" ? "" : name)} />
         <div className="search-field">
           <Search size={16} />
-          <input
+          <Input
             ref={searchInputRef}
             value={search}
             onChange={(event) => updateParam("q", event.target.value)}

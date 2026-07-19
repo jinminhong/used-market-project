@@ -34,7 +34,7 @@ public class OrdersService {
         if (!item.getStatus().equals(SELLING)) {
             throw new ItemException("구매할 수 없는 상품입니다");
         }
-        if (item.getMember().getId().equals(memberId)) {
+        if (item.getSeller().getId().equals(memberId)) {
             throw new ItemException("본인이 등록한 상품은 구매할 수 없습니다.");
         }
         Member member = memberRepository.findById(memberId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));

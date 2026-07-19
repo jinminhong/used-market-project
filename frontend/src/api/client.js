@@ -129,9 +129,28 @@ export function createApi(useMock) {
       const hasNext = start + size < purchases.length;
       return { list, hasNext };
     }
-    if (path === "/orders/sales" && method === "GET") {
+    if (path.startsWith("/orders/sales") && method === "GET") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
-      return mockOrders.filter((order) => order.sellerId === mockMember.memberId);
+      const params = new URLSearchParams(path.split("?")[1] ?? "");
+      const page = Number(params.get("page") ?? 0);
+      const size = Number(params.get("size") ?? 10);
+      const sales = mockOrders
+        .filter((order) => order.sellerId === mockMember.memberId)
+        .map((order) => ({
+          orderId: order.orderId,
+          itemId: order.item.itemId,
+          name: order.item.name,
+          description: order.item.description,
+          price: order.item.price,
+          status: order.item.status,
+          sellerNickName: order.sellerNickName,
+          imageUrl: order.item.imageUrl,
+          purchaseDate: order.createdDate,
+        }));
+      const start = page * size;
+      const list = sales.slice(start, start + size);
+      const hasNext = start + size < sales.length;
+      return { list, hasNext };
     }
     const orderItemId = Number(path.match(/^\/orders\/(\d+)$/)?.[1]);
     if (path.startsWith("/orders/") && method === "POST" && orderItemId) {
@@ -153,16 +172,28 @@ export function createApi(useMock) {
       mockOrders = [order, ...mockOrders];
       return order;
     }
-    if (path === "/wishlist" && method === "GET") {
+    if (path.startsWith("/wishlist") && method === "GET") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
-      return mockItems.filter((item) => mockWishlist.includes(item.itemId));
+      const list = mockItems
+        .filter((item) => mockWishlist.includes(item.itemId))
+        .map((item, index) => ({
+          wishListId: index + 1,
+          itemId: item.itemId,
+          itemName: item.name,
+          description: item.description,
+          price: item.price,
+          itemStatus: item.status,
+          sellerNickName: item.nickName,
+          thumbnailFilename: item.thumbnailFilename,
+          imageUrl: item.imageUrl,
+        }));
+      return { list, hasNext: false };
     }
     const wishItemId = Number(path.match(/^\/wishlist\/(\d+)$/)?.[1]);
     if (path.startsWith("/wishlist/") && method === "POST" && wishItemId) {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
-      const wished = mockWishlist.includes(wishItemId);
-      mockWishlist = wished ? mockWishlist.filter((id) => id !== wishItemId) : [...mockWishlist, wishItemId];
-      return { itemId: wishItemId, wished: !wished };
+      if (!mockWishlist.includes(wishItemId)) mockWishlist = [...mockWishlist, wishItemId];
+      return { addWishList: "add" };
     }
     if (path === "/members/me" && method === "GET") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
@@ -225,8 +256,8 @@ export function createApi(useMock) {
     deleteItem: (id) => request(`/items/${id}`, { method: "DELETE" }),
     buyItem: (itemId) => request(`/orders/${itemId}`, { method: "POST" }),
     listPurchases: (page = 0, size = 10) => request(`/orders/purchases?page=${page}&size=${size}`),
-    listSales: () => request("/orders/sales"),
-    listWishlist: () => request("/wishlist"),
-    toggleWishlist: (itemId) => request(`/wishlist/${itemId}`, { method: "POST" }),
+    listSales: (page = 0, size = 10) => request(`/orders/sales?page=${page}&size=${size}`),
+    listWishlist: (page = 0, size = 10) => request(`/wishlist?page=${page}&size=${size}`),
+    addWishlist: (itemId) => request(`/wishlist/${itemId}`, { method: "POST" }),
   };
 }

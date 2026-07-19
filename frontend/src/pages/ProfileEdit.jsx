@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeMemberInfo } from "../api/normalize.js";
 
@@ -7,6 +7,7 @@ const emptyForm = { name: "", nickname: "", password: "", passwordConfirm: "", c
 
 export default function ProfileEdit() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { api, setMember, run, loading, setNotice } = useSession();
   const [form, setForm] = useState(emptyForm);
   const [ready, setReady] = useState(false);
@@ -83,7 +84,7 @@ export default function ProfileEdit() {
       if (form.password.trim()) payload.password = form.password;
       await api.updateMyInfo(payload);
       setMember((current) => (current ? { ...current, nickName: form.nickname } : current));
-      navigate("/profile");
+      navigate(searchParams.get("next") || "/profile");
     }, "회원정보가 수정되었습니다.");
   }
 
@@ -114,7 +115,7 @@ export default function ProfileEdit() {
           <input name="zipcode" value={form.zipcode} onChange={change} placeholder="우편번호" />
           <button disabled={loading}>저장</button>
         </form>
-        <button className="text-button" type="button" onClick={() => navigate("/profile")}>취소</button>
+        <button className="text-button" type="button" onClick={() => navigate(searchParams.get("next") || "/profile")}>취소</button>
       </section>
     </main>
   );

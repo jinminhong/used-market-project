@@ -6,7 +6,7 @@ export default function RequireAuth({ children }) {
   const location = useLocation();
 
   if (!member) {
-    return <Navigate to={`/auth?next=${encodeURIComponent(location.pathname)}`} replace />;
+    return <Navigate to={`/auth?next=${encodeURIComponent(location.pathname + location.search)}`} replace />;
   }
 
   return children;

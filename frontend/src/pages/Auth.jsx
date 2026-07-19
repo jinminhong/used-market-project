@@ -2,9 +2,12 @@ import { useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeMember } from "../api/normalize.js";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
+import { Input } from "../components/ui/input.jsx";
+import { Button } from "../components/ui/button.jsx";
 
 export default function Auth() {
-  const { api, member, setMember, run, loading } = useSession();
+  const { api, member, setMember, run, loading, setNotice } = useSession();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState("login");
@@ -53,7 +56,9 @@ export default function Auth() {
           throw new Error("닉네임 중복확인을 해주세요.");
         }
         await api.signup(form);
-        setMode("login");
+        const signedUpMember = await api.login({ loginId: form.loginId, password: form.password });
+        setMember(normalizeMember(signedUpMember));
+        navigate(searchParams.get("next") || "/");
         return;
       }
       const loginMember = await api.login({ loginId: form.loginId, password: form.password });
@@ -65,34 +70,36 @@ export default function Auth() {
   return (
     <main className="form-page">
       <section className="form-panel auth-card">
-        <div className="auth-toggle">
-          <button type="button" className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>로그인</button>
-          <button type="button" className={mode === "signup" ? "active" : ""} onClick={() => setMode("signup")}>회원가입</button>
-        </div>
+        <Tabs value={mode} onValueChange={setMode}>
+          <TabsList className="w-full">
+            <TabsTrigger value="login" className="flex-1">로그인</TabsTrigger>
+            <TabsTrigger value="signup" className="flex-1">회원가입</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <p>{mode === "login" ? "Welcome back" : "Create account"}</p>
         <h1>{mode === "login" ? "로그인" : "회원가입"}</h1>
         <form onSubmit={submit}>
           {mode === "signup" ? (
             <div className="field-with-action">
-              <input name="loginId" value={form.loginId} onChange={change} placeholder="로그인 ID" />
-              <button type="button" onClick={checkId} disabled={loading}>중복확인</button>
+              <Input name="loginId" value={form.loginId} onChange={change} placeholder="로그인 ID" />
+              <Button type="button" variant="outline" size="sm" onClick={checkId} disabled={loading}>중복확인</Button>
             </div>
           ) : (
-            <input name="loginId" value={form.loginId} onChange={change} placeholder="로그인 ID" />
+            <Input name="loginId" value={form.loginId} onChange={change} placeholder="로그인 ID" />
           )}
           {mode === "signup" && idCheck && idCheck.value === form.loginId.trim() && (
             <p className={`field-hint ${idCheck.available ? "ok" : "error"}`}>
               {idCheck.available ? "사용 가능한 아이디입니다." : "이미 사용 중인 아이디입니다."}
             </p>
           )}
-          <input name="password" type="password" value={form.password} onChange={change} placeholder="비밀번호" />
+          <Input name="password" type="password" value={form.password} onChange={change} placeholder="비밀번호" />
           {mode === "signup" && (
             <>
-              <input name="passwordConfirm" type="password" value={form.passwordConfirm} onChange={change} placeholder="비밀번호 확인" />
-              <input name="name" value={form.name} onChange={change} placeholder="이름" />
+              <Input name="passwordConfirm" type="password" value={form.passwordConfirm} onChange={change} placeholder="비밀번호 확인" />
+              <Input name="name" value={form.name} onChange={change} placeholder="이름" />
               <div className="field-with-action">
-                <input name="nickname" value={form.nickname} onChange={change} placeholder="닉네임" />
-                <button type="button" onClick={checkNickname} disabled={loading}>중복확인</button>
+                <Input name="nickname" value={form.nickname} onChange={change} placeholder="닉네임" />
+                <Button type="button" variant="outline" size="sm" onClick={checkNickname} disabled={loading}>중복확인</Button>
               </div>
               {nicknameCheck && nicknameCheck.value === form.nickname.trim() && (
                 <p className={`field-hint ${nicknameCheck.available ? "ok" : "error"}`}>
@@ -101,7 +108,7 @@ export default function Auth() {
               )}
             </>
           )}
-          <button disabled={loading}>{mode === "login" ? "로그인" : "가입하기"}</button>
+          <Button className="w-full" disabled={loading}>{mode === "login" ? "로그인" : "가입하기"}</Button>
         </form>
       </section>
     </main>

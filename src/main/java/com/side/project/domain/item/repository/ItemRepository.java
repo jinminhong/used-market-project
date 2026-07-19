@@ -13,12 +13,12 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 
 public interface ItemRepository extends JpaRepository<Item, Long> , ItemRepositoryCustom{
-    @Query("select i from Item i join fetch i.member where i.id=:id")
+    @Query("select i from Item i join fetch i.seller where i.id=:id")
     Optional<Item> findByIdWithMember(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000"))
-    @Query("select i from Item i join fetch i.member where i.id = :id")
+    @Query("select i from Item i join fetch i.seller where i.id = :id")
     Optional<Item> findByIdWithMemberForUpdate(@Param("id") Long id);
 
 }

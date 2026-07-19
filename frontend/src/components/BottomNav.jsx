@@ -31,7 +31,11 @@ export default function BottomNav() {
           <span>내 상점</span>
         </Link>
         {member ? (
-          <button type="button" className="bottom-nav-item" onClick={handleAccountClick}>
+          <button
+            type="button"
+            className="bottom-nav-item transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            onClick={handleAccountClick}
+          >
             <LogOut size={20} />
             <span>로그아웃</span>
           </button>

@@ -48,6 +48,8 @@ When `Mock API` is unchecked, the frontend calls the Spring REST API.
 
 ## Current API endpoints used by the frontend
 
+Full spec (per-domain, including not-yet-implemented/mismatched parts): see `docs/api/README.md` at the repo root.
+
 Auth and members:
 
 ```text

@@ -17,7 +17,8 @@ export default function Wishlist() {
       try {
         const data = await api.listWishlist();
         if (cancelled) return;
-        setItems((data ?? []).map((item, index) => normalizeItem(item, index + 1)));
+        const list = Array.isArray(data) ? data : data?.list ?? [];
+        setItems(list.map((item, index) => normalizeItem(item, item.itemId ?? index + 1)));
       } catch (error) {
         if (cancelled) return;
         setItems([]);

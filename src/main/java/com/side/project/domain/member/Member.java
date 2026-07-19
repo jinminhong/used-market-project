@@ -36,7 +36,7 @@ public class Member {
     @Embedded
     private Address address;
 
-    @OneToMany(mappedBy = "member")
+    @OneToMany(mappedBy = "seller")
     private List<Item> itemList = new ArrayList<>();
 
     public Member(String loginId, String name, String password , String nickName ,Address address) {

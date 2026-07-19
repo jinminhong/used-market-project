@@ -1,32 +1,79 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, Package } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
-import { normalizeOrder } from "../api/normalize.js";
+import { normalizePurchase } from "../api/normalize.js";
 import StatusPill from "../components/StatusPill.jsx";
 
+const PAGE_SIZE = 10;
+
 export default function SalesHistory() {
-  const { api, setNotice } = useSession();
+  const { api, setNotice, loading, setLoading } = useSession();
   const [orders, setOrders] = useState(null);
+  const [page, setPage] = useState(0);
+  const [hasNext, setHasNext] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const apiRef = useRef(null);
+  const inFlightRequestRef = useRef("");
+  const loadedPagesRef = useRef(new Set());
+
+  async function loadSales(targetPage = 0, append = false) {
+    const requestKey = `${append ? "append" : "replace"}:${targetPage}`;
+
+    if (append && !hasNext) return;
+    if (loadedPagesRef.current.has(targetPage)) return;
+    if (inFlightRequestRef.current === requestKey) return;
+    inFlightRequestRef.current = requestKey;
+
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+
+    try {
+      const data = await api.listSales(targetPage, PAGE_SIZE);
+      const list = data?.list ?? [];
+      const normalizedOrders = list.map(normalizePurchase);
+
+      loadedPagesRef.current.add(targetPage);
+      setOrders((current) => (append ? [...(current ?? []), ...normalizedOrders] : normalizedOrders));
+      setHasNext(Boolean(data?.hasNext));
+      setPage(targetPage + 1);
+    } catch (error) {
+      if (!append) setOrders([]);
+      setNotice(error.message || "판매내역을 불러오지 못했습니다.");
+    } finally {
+      if (inFlightRequestRef.current === requestKey) inFlightRequestRef.current = "";
+      if (append) setLoadingMore(false);
+      else setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    let cancelled = false;
-    setOrders(null);
-
-    (async () => {
-      try {
-        const data = await api.listSales();
-        if (cancelled) return;
-        setOrders((data ?? []).map((order, index) => normalizeOrder(order, index + 1)));
-      } catch (error) {
-        if (cancelled) return;
-        setOrders([]);
-        setNotice(error.message || "판매내역을 불러오지 못했습니다.");
-      }
-    })();
-
-    return () => { cancelled = true; };
+    if (apiRef.current === api) return;
+    apiRef.current = api;
+    inFlightRequestRef.current = "";
+    loadedPagesRef.current = new Set();
+    setPage(0);
+    setHasNext(true);
+    loadSales(0, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
+
+  useEffect(() => {
+    function handleScroll() {
+      const scrollBottom = window.innerHeight + window.scrollY;
+      const documentHeight = document.documentElement.scrollHeight;
+      const shouldLoadMore = documentHeight - scrollBottom < 500;
+
+      if (shouldLoadMore && hasNext && !loadingMore && !loading) {
+        loadSales(page, true);
+      }
+    }
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasNext, loadingMore, loading, page, api]);
 
   return (
     <main className="page-shell narrow-page">
@@ -47,13 +94,15 @@ export default function SalesHistory() {
               <div className="order-row-body">
                 <strong>{order.item.name}</strong>
                 <span>{order.item.price.toLocaleString()}원</span>
-                <em>구매자 @{order.buyerNickName || "알 수 없음"}</em>
+                <em>{order.purchaseDate ? new Date(order.purchaseDate).toLocaleDateString() : ""}</em>
               </div>
               <StatusPill status={order.item.status} />
             </li>
           ))}
         </ul>
       )}
+      {loadingMore && <p className="quiet-message">판매내역을 더 불러오는 중입니다.</p>}
+      {orders && orders.length > 0 && !hasNext && <p className="quiet-message">마지막 판매내역까지 모두 봤습니다.</p>}
     </main>
   );
 }

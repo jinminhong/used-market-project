@@ -31,11 +31,11 @@ export function normalizeItem(item, fallbackId) {
   return {
     itemId: item.itemId ?? item.id ?? fallbackId ?? null,
     memberId: item.memberId ?? item.sellerId ?? null,
-    name: item.name ?? item.title ?? "이름 없는 상품",
+    name: item.name ?? item.title ?? item.itemName ?? "이름 없는 상품",
     description: item.description ?? "",
     price: Number(item.price ?? 0),
-    status: item.status ?? "SELLING",
-    nickName: item.nickName ?? item.nickname ?? "",
+    status: item.status ?? item.itemStatus ?? "SELLING",
+    nickName: item.nickName ?? item.nickname ?? item.sellerNickName ?? "",
     category: item.category ?? "ETC",
     itemImages,
     imageUrl: item.imageUrl || imageUrlFromUploadFile(item.uploadFileDto) || imageUrlFromItemImages(itemImages) || imageUrlFromThumbnail(item.thumbnailFilename) || defaultImage(),
@@ -82,17 +82,5 @@ export function normalizePurchase(purchase) {
       status: purchase.status ?? "SOLD",
       imageUrl: purchase.imageUrl || imageUrlFromThumbnail(purchase.thumbnailFilename) || defaultImage(),
     },
-  };
-}
-
-export function normalizeOrder(order, fallbackId) {
-  if (!order) return null;
-  return {
-    orderId: order.orderId ?? order.id ?? fallbackId ?? null,
-    orderStatus: order.orderStatus ?? "PAY_COMPLETED",
-    createdDate: order.createdDate ?? order.createdAt ?? null,
-    item: normalizeItem(order.item ?? {}, order.itemId ?? fallbackId),
-    buyerNickName: order.buyerNickName ?? order.buyer?.nickName ?? "",
-    sellerNickName: order.sellerNickName ?? order.seller?.nickName ?? order.item?.nickName ?? "",
   };
 }

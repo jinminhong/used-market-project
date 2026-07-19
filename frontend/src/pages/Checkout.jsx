@@ -83,7 +83,7 @@ export default function Checkout() {
           <h2>배송지</h2>
           {hasAddress ? <p>{addressText}</p> : <p className="quiet-message">등록된 배송지가 없습니다. 구매를 진행하려면 배송지를 먼저 등록해주세요.</p>}
           {!hasAddress && (
-            <button type="button" onClick={() => navigate("/profile/edit")}>배송지 등록하러 가기</button>
+            <button type="button" onClick={() => navigate(`/profile/edit?next=${encodeURIComponent(`/items/${itemId}/checkout`)}`)}>배송지 등록하러 가기</button>
           )}
         </div>
         {alreadyTaken && <p className="quiet-message">이미 예약되었거나 판매 완료된 상품입니다.</p>}

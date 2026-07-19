@@ -3,10 +3,7 @@ package com.side.project.domain.item.itemdto;
 import com.side.project.domain.item.Category;
 import com.side.project.domain.item.Item;
 import com.side.project.domain.item.ItemStatus;
-import com.side.project.domain.itemimage.ItemImage;
-import com.side.project.domain.itemimage.file.UploadFile;
 import com.side.project.domain.itemimage.file.UploadFileDto;
-import com.side.project.domain.member.Member;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -36,8 +33,8 @@ public class ItemDto {
         this.price = item.getPrice();
         this.status = item.getStatus();
         this.category = item.getCategory();
-        this.memberId = item.getMember().getId();
-        this.nickName = item.getMember().getNickName();
+        this.memberId = item.getSeller().getId();
+        this.nickName = item.getSeller().getNickName();
         this.itemImages = item.getItemImages().stream().map(itemImage ->
                 new UploadFileDto(itemImage.getId(),itemImage.getOriginalFilename(),itemImage.getStoredFilename()))
                 .collect(Collectors.toList());
