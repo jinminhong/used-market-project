@@ -4,11 +4,13 @@ import { ChevronLeft, Package } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizePurchase } from "../api/normalize.js";
 import StatusPill from "../components/StatusPill.jsx";
+import OrderStatusPill from "../components/OrderStatusPill.jsx";
+import { Button } from "../components/ui/button.jsx";
 
 const PAGE_SIZE = 10;
 
 export default function SalesHistory() {
-  const { api, setNotice, loading, setLoading } = useSession();
+  const { api, run, setNotice, loading, setLoading } = useSession();
   const [orders, setOrders] = useState(null);
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(true);
@@ -75,6 +77,19 @@ export default function SalesHistory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasNext, loadingMore, loading, page, api]);
 
+  async function handleAction(orderId, action, message) {
+    await run(async () => {
+      const result = await api.changeOrderStatus(orderId, action);
+      setOrders((current) =>
+        current.map((order) =>
+          order.orderId === orderId
+            ? { ...order, orderStatus: result.status, item: { ...order.item, status: result.itemStatus } }
+            : order
+        )
+      );
+    }, message);
+  }
+
   return (
     <main className="page-shell narrow-page">
       <Link className="text-button" to="/profile"><ChevronLeft size={16} /> Back to profile</Link>
@@ -93,10 +108,31 @@ export default function SalesHistory() {
               </Link>
               <div className="order-row-body">
                 <strong>{order.item.name}</strong>
-                <span>{order.item.price.toLocaleString()}원</span>
+                <span>{(order.agreedPrice ?? order.item.price).toLocaleString()}원</span>
                 <em>{order.purchaseDate ? new Date(order.purchaseDate).toLocaleDateString() : ""}</em>
               </div>
-              <StatusPill status={order.item.status} />
+              <div className="order-row-status">
+                <StatusPill status={order.item.status} />
+                <OrderStatusPill status={order.orderStatus} />
+              </div>
+              <div className="order-row-actions">
+                {order.orderStatus === "REQUESTED" && (
+                  <>
+                    <Button size="sm" disabled={loading} onClick={() => handleAction(order.orderId, "ACCEPT", "주문을 승인했습니다.")}>승인</Button>
+                    <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 거절했습니다.")}>거절</Button>
+                  </>
+                )}
+                {order.orderStatus === "ACCEPTED" && <span className="quiet-message">구매자 결제 대기 중</span>}
+                {order.orderStatus === "PAY_COMPLETED" && (
+                  <>
+                    <Button size="sm" disabled={loading} onClick={() => handleAction(order.orderId, "SHIP", "발송 처리했습니다.")}>발송 처리</Button>
+                    <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 취소했습니다.")}>취소</Button>
+                  </>
+                )}
+                {order.orderStatus === "SHIPPING" && (
+                  <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 취소했습니다.")}>취소(귀책사유)</Button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

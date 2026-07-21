@@ -4,10 +4,18 @@ import { ChevronLeft, Heart } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeItem } from "../api/normalize.js";
 import ItemCard from "../components/ItemCard.jsx";
+import { Button } from "../components/ui/button.jsx";
 
 export default function Wishlist() {
-  const { api, setNotice } = useSession();
+  const { api, run, setNotice } = useSession();
   const [items, setItems] = useState(null);
+
+  async function handleRemove(itemId) {
+    await run(async () => {
+      await api.removeWishlist(itemId);
+      setItems((current) => (current ?? []).filter((item) => item.itemId !== itemId));
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +48,18 @@ export default function Wishlist() {
       {items && items.length > 0 && (
         <section className="product-grid">
           {items.map((item, index) => (
-            <ItemCard key={`${item.itemId ?? item.name}-${index}`} item={item} />
+            <div className="wishlist-item" key={`${item.itemId ?? item.name}-${index}`}>
+              <ItemCard item={item} />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="wishlist-remove-button text-red-600"
+                aria-label="찜 해제하기"
+                onClick={() => handleRemove(item.itemId)}
+              >
+                <Heart size={18} fill="currentColor" />
+              </Button>
+            </div>
           ))}
         </section>
       )}

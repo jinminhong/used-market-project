@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
-import { normalizeItem, imageUrlFromUploadFile, defaultImage } from "../api/normalize.js";
+import { normalizeItem, normalizeChatRoom, imageUrlFromUploadFile, defaultImage } from "../api/normalize.js";
+import { upsertChatRoom } from "../lib/chatStorage.js";
 import StatusPill from "../components/StatusPill.jsx";
 import { Button } from "../components/ui/button.jsx";
 
@@ -39,6 +40,20 @@ export default function Detail() {
     return () => { cancelled = true; };
   }, [api, itemId]);
 
+  useEffect(() => {
+    if (!member || !item?.itemId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await api.findWished(item.itemId);
+        if (!cancelled) setWished(result?.wished === true || result?.wished === "true");
+      } catch {
+        // 찜 여부 조회 실패는 조용히 무시하고 기본값(false) 유지
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [api, member, item?.itemId]);
+
   if (notFound) {
     return (
       <main className="page-shell narrow-page">
@@ -54,6 +69,7 @@ export default function Detail() {
   const slideImages = imageUrls.length ? imageUrls : [item.imageUrl || defaultImage()];
   const isOwner = Boolean(member?.memberId) && member.memberId === item.memberId;
   const canMutate = isOwner && item.itemId;
+  const canEdit = canMutate && item.status === "SELLING";
 
   function moveSlide(step) {
     setActiveImageIndex((current) => (current + step + slideImages.length) % slideImages.length);
@@ -78,22 +94,38 @@ export default function Detail() {
     navigate(`/items/${item.itemId}/checkout`);
   }
 
-  function handleInquire() {
+  async function handleInquire() {
     if (!member) {
       redirectToAuth();
       return;
     }
-    setNotice("준비 중인 기능입니다.");
+    await run(async () => {
+      const room = normalizeChatRoom(await api.createChatRoom(item.itemId));
+      upsertChatRoom(member.memberId, {
+        roomId: room.roomId,
+        itemId: item.itemId,
+        itemName: item.name,
+        itemImageUrl: item.imageUrl,
+        counterpart: { memberId: item.memberId, nickName: item.nickName },
+        role: "buyer",
+      });
+      navigate(`/chat/${room.roomId}`);
+    });
   }
 
-  async function handleAddWishlist() {
-    if (!member || wished) {
-      if (!member) redirectToAuth();
+  async function handleToggleWishlist() {
+    if (!member) {
+      redirectToAuth();
       return;
     }
     await run(async () => {
-      await api.addWishlist(item.itemId);
-      setWished(true);
+      if (wished) {
+        await api.removeWishlist(item.itemId);
+        setWished(false);
+      } else {
+        await api.addWishlist(item.itemId);
+        setWished(true);
+      }
     });
   }
 
@@ -157,24 +189,24 @@ export default function Detail() {
           <p>{item.description || "등록된 설명이 없습니다."}</p>
           {isOwner ? (
             <div className="owner-actions">
-              <Button size="lg" variant="secondary" onClick={() => navigate(`/items/${item.itemId}/edit`)} disabled={!canMutate || loading}>수정하기</Button>
+              <Button size="lg" variant="secondary" onClick={() => navigate(`/items/${item.itemId}/edit`)} disabled={!canEdit || loading}>수정하기</Button>
               <Button size="lg" variant="destructive" onClick={handleRemove} disabled={!canMutate || loading}>삭제하기</Button>
             </div>
           ) : (
             <div className="buyer-actions">
               <Button size="lg" onClick={handleBuy}>{member ? "구매하기" : "로그인하고 구매하기"}</Button>
-              <Button size="lg" variant="outline" onClick={handleInquire}>{member ? "구매 문의하기" : "로그인하고 문의하기"}</Button>
+              <Button size="lg" variant="outline" onClick={handleInquire}>{member ? "구매 문의 · 가격제안" : "로그인하고 문의하기"}</Button>
               <Button
                 size="lg"
                 variant={wished ? "secondary" : "ghost"}
-                onClick={handleAddWishlist}
-                disabled={loading || wished}
+                onClick={handleToggleWishlist}
+                disabled={loading}
                 aria-pressed={wished}
-                aria-label={wished ? "찜한 상품" : "찜하기"}
+                aria-label={wished ? "찜 해제하기" : "찜하기"}
                 className={wished ? "text-red-600" : undefined}
               >
                 <Heart size={18} fill={wished ? "currentColor" : "none"} />
-                <span>{wished ? "찜 완료" : "찜하기"}</span>
+                <span>{wished ? "찜 해제" : "찜하기"}</span>
               </Button>
             </div>
           )}

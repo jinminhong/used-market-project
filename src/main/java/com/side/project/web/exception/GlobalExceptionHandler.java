@@ -1,14 +1,20 @@
 package com.side.project.web.exception;
 
+import com.side.project.web.exception.chat.message.ChatMessageException;
+import com.side.project.web.exception.chat.room.ChatRoomException;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.login.LoginFailException;
 import com.side.project.web.exception.login.UnauthorizedException;
 import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.member.MemberException;
+import com.side.project.web.exception.wishlist.WishListException;
+import com.side.project.web.exception.wishlist.WishListNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -35,5 +41,20 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity requiredLoginException(UnauthorizedException e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+    }
+
+    @ExceptionHandler(WishListException.class)
+    public ResponseEntity wishListException(WishListException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
+    }
+
+    @ExceptionHandler(WishListNotFoundException.class)
+    public ResponseEntity wishListNotFoundException(WishListNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+    }
+
+    @ExceptionHandler(ChatRoomException.class)
+    public ResponseEntity chatRoomException(HttpStatus httpStatus, ChatRoomException e) {
+        return ResponseEntity.status(httpStatus).body(e.getMessage());
     }
 }

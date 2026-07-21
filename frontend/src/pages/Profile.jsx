@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Store, Package, ShoppingBag, Heart } from "lucide-react";
+import { ChevronLeft, Store, Package, ShoppingBag, Heart, MessageCircle } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeMemberInfo } from "../api/normalize.js";
 
@@ -67,6 +67,10 @@ export default function Profile() {
         <Link to="/profile/wishlist">
           <Heart size={20} />
           <span>위시리스트</span>
+        </Link>
+        <Link to="/chat">
+          <MessageCircle size={20} />
+          <span>채팅</span>
         </Link>
       </nav>
       <section className="profile-detail-card">

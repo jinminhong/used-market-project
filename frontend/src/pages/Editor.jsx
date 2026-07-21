@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ImagePlus, X } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
-import { CATEGORIES, STATUSES } from "../api/constants.js";
+import { CATEGORIES } from "../api/constants.js";
 import { normalizeItem } from "../api/normalize.js";
 
-const emptyForm = { name: "", description: "", price: "", status: "SELLING", category: "ETC", imageUrl: "", imageFiles: [], imagePreview: "", itemImages: [], deletedFileIds: [] };
+const emptyForm = { name: "", description: "", price: "", category: "ETC", imageUrl: "", imageFiles: [], imagePreview: "", itemImages: [], deletedFileIds: [] };
 
 export default function Editor() {
   const { itemId } = useParams();
@@ -37,7 +37,6 @@ export default function Editor() {
           name: item.name,
           description: item.description,
           price: String(item.price),
-          status: item.status,
           category: item.category,
           imageUrl: item.imageUrl,
           imageFiles: [],
@@ -135,12 +134,7 @@ export default function Editor() {
             {form.imagePreview && <img src={form.imagePreview} alt="" />}
           </label>
           <textarea name="description" value={form.description} onChange={change} placeholder="상품 설명" />
-          <div className="split-fields">
-            <select name="status" value={form.status} onChange={change}>
-              {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-            </select>
-            <button disabled={loading}>저장</button>
-          </div>
+          <button disabled={loading}>저장</button>
         </form>
         <button className="text-button" type="button" onClick={() => navigate(isEdit ? `/items/${itemId}` : "/")}>취소</button>
       </section>

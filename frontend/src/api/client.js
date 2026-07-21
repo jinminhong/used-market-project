@@ -9,7 +9,6 @@ export function buildItemFormData(data, dtoPartName, includeEmptyFilePart = fals
     category: data.category === "All" ? "ETC" : data.category,
   };
   if (dtoPartName === "itemUpdateDto") {
-    itemDto.status = data.status;
     itemDto.deletedFileIds = data.deletedFileIds ?? [];
   }
   const formData = new FormData();
@@ -22,10 +21,26 @@ export function buildItemFormData(data, dtoPartName, includeEmptyFilePart = fals
   return formData;
 }
 
+function buildSeedOrders(items) {
+  const byId = (id) => items.find((item) => item.itemId === id);
+  const item1 = byId(1);
+  const item2 = byId(2);
+  const item3 = byId(3);
+  const item4 = byId(4);
+  const now = new Date().toISOString();
+  const seeds = [];
+  // 데모용 시드 주문 4건: 판매자/구매자 양쪽 시점에서 REQUESTED~COMPLETED 전 단계 액션 버튼을 바로 확인할 수 있게 구성
+  if (item1) seeds.push({ orderId: 9001, buyerId: 2, buyerNickName: "lee", sellerId: 1, sellerNickName: "hong", item: { ...item1, status: "RESERVED" }, orderStatus: "ACCEPTED", agreedPrice: 170000, createdDate: now });
+  if (item2) seeds.push({ orderId: 9002, buyerId: 1, buyerNickName: "hong", sellerId: 2, sellerNickName: "lee", item: { ...item2, status: "RESERVED" }, orderStatus: "SHIPPING", agreedPrice: 46000, createdDate: now });
+  if (item3) seeds.push({ orderId: 9003, buyerId: 2, buyerNickName: "lee", sellerId: 1, sellerNickName: "hong", item: { ...item3, status: "RESERVED" }, orderStatus: "REQUESTED", agreedPrice: 60000, createdDate: now });
+  if (item4) seeds.push({ orderId: 9004, buyerId: 1, buyerNickName: "hong", sellerId: 3, sellerNickName: "mori", item: { ...item4, status: "SOLD" }, orderStatus: "COMPLETED", agreedPrice: 88000, createdDate: now });
+  return seeds;
+}
+
 export function createApi(useMock) {
-  let mockItems = [...sampleItems];
+  let mockItems = [...sampleItems].map((item) => (item.itemId === 1 || item.itemId === 3) ? { ...item, status: "RESERVED" } : item);
   let mockMember = null;
-  let mockOrders = [];
+  let mockOrders = useMock ? buildSeedOrders(mockItems) : [];
   let mockWishlist = [];
 
   async function request(path, options = {}) {
@@ -115,6 +130,8 @@ export function createApi(useMock) {
         .filter((order) => order.buyerId === mockMember.memberId)
         .map((order) => ({
           orderId: order.orderId,
+          orderStatus: order.orderStatus,
+          agreedPrice: order.agreedPrice,
           itemId: order.item.itemId,
           name: order.item.name,
           description: order.item.description,
@@ -138,6 +155,8 @@ export function createApi(useMock) {
         .filter((order) => order.sellerId === mockMember.memberId)
         .map((order) => ({
           orderId: order.orderId,
+          orderStatus: order.orderStatus,
+          agreedPrice: order.agreedPrice,
           itemId: order.item.itemId,
           name: order.item.name,
           description: order.item.description,
@@ -167,12 +186,68 @@ export function createApi(useMock) {
         sellerNickName: target.nickName,
         item: { ...target, status: "RESERVED" },
         orderStatus: "PAY_COMPLETED",
+        agreedPrice: target.price,
         createdDate: new Date().toISOString(),
       };
       mockOrders = [order, ...mockOrders];
       return order;
     }
-    if (path.startsWith("/wishlist") && method === "GET") {
+    const patchOrderId = Number(path.match(/^\/orders\/(\d+)$/)?.[1]);
+    if (path.startsWith("/orders/") && method === "PATCH" && patchOrderId) {
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      const order = mockOrders.find((o) => o.orderId === patchOrderId);
+      if (!order) throw new Error("주문을 찾을 수 없습니다.");
+      const isBuyer = mockMember.memberId === order.buyerId;
+      const isSeller = mockMember.memberId === order.sellerId;
+      if (!isBuyer && !isSeller) throw new Error("이 주문을 처리할 권한이 없습니다.");
+
+      const action = body?.action;
+      const before = order.orderStatus;
+      let nextStatus = before;
+      let nextItemStatus = order.item.status;
+
+      if (action === "ACCEPT") {
+        if (before !== "REQUESTED") throw new Error("잘못된 순서의 상태 변경입니다.");
+        if (!isSeller) throw new Error("판매자만 승인할 수 있습니다.");
+        nextStatus = "ACCEPTED";
+      } else if (action === "PAY") {
+        if (before !== "ACCEPTED") throw new Error("잘못된 순서의 상태 변경입니다.");
+        if (!isBuyer) throw new Error("구매자만 결제할 수 있습니다.");
+        nextStatus = "PAY_COMPLETED";
+      } else if (action === "SHIP") {
+        if (before !== "PAY_COMPLETED") throw new Error("잘못된 순서의 상태 변경입니다.");
+        if (!isSeller) throw new Error("판매자만 발송 처리할 수 있습니다.");
+        nextStatus = "SHIPPING";
+      } else if (action === "CONFIRM") {
+        if (before !== "SHIPPING") throw new Error("잘못된 순서의 상태 변경입니다.");
+        if (!isBuyer) throw new Error("구매자만 구매확정할 수 있습니다.");
+        nextStatus = "COMPLETED";
+        nextItemStatus = "SOLD";
+      } else if (action === "CANCEL") {
+        if (before === "COMPLETED" || before === "CANCELED") throw new Error("취소할 수 없는 주문입니다.");
+        if ((before === "PAY_COMPLETED" || before === "SHIPPING") && !isSeller) {
+          throw new Error("판매자 동의가 필요합니다.");
+        }
+        nextStatus = "CANCELED";
+        nextItemStatus = "SELLING";
+      } else {
+        throw new Error("알 수 없는 action 입니다.");
+      }
+
+      mockOrders = mockOrders.map((o) =>
+        o.orderId === patchOrderId ? { ...o, orderStatus: nextStatus, item: { ...o.item, status: nextItemStatus } } : o
+      );
+      mockItems = mockItems.map((item) =>
+        item.itemId === order.item.itemId ? { ...item, status: nextItemStatus } : item
+      );
+      return { orderId: patchOrderId, itemId: order.item.itemId, status: nextStatus, itemStatus: nextItemStatus };
+    }
+    const wishItemId = Number(path.match(/^\/wishlist\/(\d+)/)?.[1]);
+    if (path.startsWith("/wishlist/") && method === "GET" && wishItemId) {
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      return { itemId: String(wishItemId), wished: String(mockWishlist.includes(wishItemId)) };
+    }
+    if ((path === "/wishlist" || path.startsWith("/wishlist?")) && method === "GET") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
       const list = mockItems
         .filter((item) => mockWishlist.includes(item.itemId))
@@ -189,11 +264,20 @@ export function createApi(useMock) {
         }));
       return { list, hasNext: false };
     }
-    const wishItemId = Number(path.match(/^\/wishlist\/(\d+)$/)?.[1]);
     if (path.startsWith("/wishlist/") && method === "POST" && wishItemId) {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
-      if (!mockWishlist.includes(wishItemId)) mockWishlist = [...mockWishlist, wishItemId];
-      return { addWishList: "add" };
+      if (mockWishlist.includes(wishItemId)) throw new Error("이미 찜한 상품입니다.");
+      mockWishlist = [...mockWishlist, wishItemId];
+      return { itemId: String(wishItemId), wished: "true" };
+    }
+    if (path.startsWith("/wishlist/") && method === "DELETE" && wishItemId) {
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      if (!mockWishlist.includes(wishItemId)) throw new Error("찜한 상품을 찾을 수 없습니다.");
+      mockWishlist = mockWishlist.filter((id) => id !== wishItemId);
+      return { itemId: String(wishItemId), wished: "false" };
+    }
+    if (path === "/chat/rooms" && method === "POST") {
+      throw new Error("Mock 모드에서는 채팅 기능을 사용할 수 없습니다.");
     }
     if (path === "/members/me" && method === "GET") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
@@ -257,7 +341,11 @@ export function createApi(useMock) {
     buyItem: (itemId) => request(`/orders/${itemId}`, { method: "POST" }),
     listPurchases: (page = 0, size = 10) => request(`/orders/purchases?page=${page}&size=${size}`),
     listSales: (page = 0, size = 10) => request(`/orders/sales?page=${page}&size=${size}`),
+    changeOrderStatus: (orderId, action) => request(`/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ action }) }),
     listWishlist: (page = 0, size = 10) => request(`/wishlist?page=${page}&size=${size}`),
     addWishlist: (itemId) => request(`/wishlist/${itemId}`, { method: "POST" }),
+    removeWishlist: (itemId) => request(`/wishlist/${itemId}`, { method: "DELETE" }),
+    findWished: (itemId) => request(`/wishlist/${itemId}`),
+    createChatRoom: (itemId) => request("/chat/rooms", { method: "POST", body: JSON.stringify({ itemId }) }),
   };
 }

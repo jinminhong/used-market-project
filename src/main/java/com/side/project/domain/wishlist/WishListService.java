@@ -9,6 +9,8 @@ import com.side.project.domain.wishlist.wishlistdto.WishListPageResponseDto;
 import com.side.project.domain.wishlist.wishlistdto.WishListResponseDto;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.member.MemberException;
+import com.side.project.web.exception.wishlist.WishListException;
+import com.side.project.web.exception.wishlist.WishListNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,24 +29,26 @@ public class WishListService {
     private final ItemRepository itemRepository;
     private final MemberRepository memberRepository;
 
-    @Transactional
-    public void addWishList(Long itemId , Long memberId) {
-        if (wishListRepository.existsByItemIdAndMemberId(itemId, memberId)) {
-            return;
-        }
-        Item item = itemRepository.findById(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다."));
-        Member member = memberRepository.findById(memberId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
-        wishListRepository.save(new WishList(item , member));
-    }
-
     public WishListPageResponseDto getWishList(Long memberId, Pageable pageable) {
         Slice<WishListResponseDto> wishList = wishListRepository.findAllWishList(memberId, pageable);
         return new WishListPageResponseDto(wishList.getContent(), wishList.hasNext());
     }
 
-//    @Transactional
-//    public void removeWishList(Long itemId, Long memberId) {
-//        wishListRepository.fi
-//        wishListRepository.delete();
-//    }
+    @Transactional
+    public void addWishList(Long itemId , Long memberId) {
+        if (existWishList(itemId, memberId)) throw new WishListException("이미 찜한 상품입니다.");
+        Item item = itemRepository.findById(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다."));
+        Member member = memberRepository.findById(memberId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+        wishListRepository.save(new WishList(item , member));
+    }
+
+    public boolean existWishList(Long itemId, Long memberId) {
+        return wishListRepository.existsByItemIdAndMemberId(itemId, memberId);
+    }
+
+    @Transactional
+    public void deleteWishList(Long itemId, Long memberId) {
+        WishList wishList = wishListRepository.findWishListByItemIdAndMemberId(itemId, memberId).orElseThrow(() -> new WishListNotFoundException("찜한 상품을 찾을 수 없습니다."));
+        wishListRepository.delete(wishList);
+    }
 }

@@ -26,11 +26,27 @@ public class WishListController {
         return ResponseEntity.ok(wishListService.getWishList(loginMember.getMemberId(), pageRequest));
     }
 
+    @GetMapping("/{itemId}")
+    public ResponseEntity<Map<String, String>> findItemWished(@Login LoginMember loginMember,
+                                                              @PathVariable("itemId") Long itemId) {
+        Long memberId = loginMember.getMemberId();
+        boolean wished = wishListService.existWishList(itemId, memberId);
+        return ResponseEntity.ok(Map.of("itemId", "" + itemId, "wished", "" + wished));
+    }
+
     @PostMapping("/{itemId}")
     public ResponseEntity<Map<String,String>> addWishList(@Login LoginMember loginMember,
                                          @PathVariable("itemId") Long itemId) {
         Long memberId = loginMember.getMemberId();
         wishListService.addWishList(itemId ,memberId);
         return ResponseEntity.ok(Map.of("itemId" , ""+itemId , "wished","true"));
+    }
+
+    @DeleteMapping("/{itemId}")
+    public ResponseEntity<Map<String,String>> deleteWishList(@Login LoginMember loginMember,
+                                                             @PathVariable("itemId") Long itemId) {
+        Long memberId = loginMember.getMemberId();
+        wishListService.deleteWishList(itemId, memberId);
+        return ResponseEntity.ok(Map.of("itemId", "" + itemId, "wished", "false"));
     }
 }

@@ -68,10 +68,38 @@ export function normalizeShop(shop) {
   };
 }
 
+export function normalizeChatRoom(raw) {
+  if (!raw) return null;
+  return {
+    roomId: raw.roomId ?? raw.id ?? null,
+    itemId: raw.itemId ?? null,
+    buyerId: raw.buyerId ?? null,
+    sellerId: raw.sellerId ?? null,
+  };
+}
+
+export function normalizeChatMessage(raw) {
+  if (!raw) return null;
+  return {
+    messageId: raw.messageId ?? null,
+    roomId: raw.roomId ?? null,
+    senderId: raw.senderId ?? null,
+    senderNickname: raw.senderNickname ?? raw.senderNickName ?? "",
+    content: raw.content ?? "",
+    sentAt: raw.sentAt ?? null,
+    type: raw.type ?? "TEXT",
+    offeredPrice: raw.offeredPrice != null ? Number(raw.offeredPrice) : null,
+    offerStatus: raw.offerStatus ?? null,
+    orderId: raw.orderId ?? null,
+  };
+}
+
 export function normalizePurchase(purchase) {
   if (!purchase) return null;
   return {
     orderId: purchase.orderId ?? null,
+    orderStatus: purchase.orderStatus ?? "PAY_COMPLETED",
+    agreedPrice: purchase.agreedPrice != null ? Number(purchase.agreedPrice) : null,
     purchaseDate: purchase.purchaseDate ?? null,
     sellerNickName: purchase.sellerNickName ?? "",
     item: {
