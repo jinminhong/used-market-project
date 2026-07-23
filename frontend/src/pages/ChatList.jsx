@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, MessageCircle } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
@@ -12,29 +12,31 @@ export default function ChatList() {
   const [rooms, setRooms] = useState([]);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [loading, setLoading] = useState(false);
+  const roomsFetchKeyRef = useRef("");
 
   useEffect(() => {
     if (!member || useMock) {
       setRooms([]);
       return;
     }
-    let cancelled = false;
+    const key = `${member.memberId}:${useMock}`;
+    if (roomsFetchKeyRef.current === key) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    roomsFetchKeyRef.current = key;
     setLoading(true);
     (async () => {
       try {
         const response = await api.listChatRooms();
         const list = (response?.chatRooms ?? []).map(normalizeChatRoom);
-        if (!cancelled) {
+        if (roomsFetchKeyRef.current === key) {
           setRooms(list);
           setUnreadCounts({});
         }
       } catch {
-        if (!cancelled) setRooms([]);
+        if (roomsFetchKeyRef.current === key) setRooms([]);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (roomsFetchKeyRef.current === key) setLoading(false);
       }
     })();
-    return () => { cancelled = true; };
   }, [api, member, useMock]);
 
   const roomIds = rooms.map((room) => room.roomId).join(",");

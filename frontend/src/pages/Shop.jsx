@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Plus } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
@@ -12,25 +12,27 @@ export default function Shop() {
   const [shop, setShop] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const isOwnShop = Boolean(member) && member.memberId === Number(memberId);
+  const shopFetchKeyRef = useRef("");
 
   useEffect(() => {
-    let cancelled = false;
+    const key = String(memberId);
+    if (shopFetchKeyRef.current === key) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    shopFetchKeyRef.current = key;
+
     setShop(null);
     setNotFound(false);
 
     (async () => {
       try {
         const data = await api.findShop(Number(memberId));
-        if (cancelled) return;
+        if (shopFetchKeyRef.current !== key) return;
         setShop(normalizeShop({ ...data, memberId: Number(memberId) }));
       } catch (error) {
-        if (cancelled) return;
+        if (shopFetchKeyRef.current !== key) return;
         setNotFound(true);
         setNotice(error.message || "상점 정보를 불러오지 못했습니다.");
       }
     })();
-
-    return () => { cancelled = true; };
   }, [api, memberId]);
 
   if (notFound) {

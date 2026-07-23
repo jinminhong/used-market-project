@@ -13,7 +13,7 @@ export default function ChatRoom() {
   const location = useLocation();
   const navigate = useNavigate();
   const { api, member } = useSession();
-  const { connected, connectionError, subscribeRoom, sendMessage, acceptOffer, rejectOffer } = useChatSocket();
+  const { connected, connectionError, subscribeRoom, sendMessage } = useChatSocket();
   const [roomMeta, setRoomMeta] = useState(null);
   const [isSeller, setIsSeller] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -23,46 +23,54 @@ export default function ChatRoom() {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef(null);
   const autoOfferSentRef = useRef(false);
+  const roomMetaFetchKeyRef = useRef("");
+  const messagesFetchKeyRef = useRef("");
 
   useEffect(() => {
-    let cancelled = false;
+    if (!member?.memberId) {
+      setRoomMeta(null);
+      setIsSeller(false);
+      return;
+    }
+    const key = `${member.memberId}:${roomId}`;
+    if (roomMetaFetchKeyRef.current === key) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    roomMetaFetchKeyRef.current = key;
     setRoomMeta(null);
     setIsSeller(false);
-    if (!member?.memberId) return undefined;
     (async () => {
       try {
         const response = await api.listChatRooms();
         const rooms = (response?.chatRooms ?? []).map(normalizeChatRoom);
         const room = rooms.find((r) => String(r.roomId) === String(roomId)) ?? null;
-        if (cancelled) return;
+        if (roomMetaFetchKeyRef.current !== key) return;
         setRoomMeta(room);
         setIsSeller(room?.sellerId === member.memberId);
       } catch {
-        if (!cancelled) {
+        if (roomMetaFetchKeyRef.current === key) {
           setRoomMeta(null);
           setIsSeller(false);
         }
       }
     })();
-    return () => { cancelled = true; };
   }, [api, member?.memberId, roomId]);
 
   useEffect(() => {
-    let cancelled = false;
+    const key = String(roomId);
+    if (messagesFetchKeyRef.current === key) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    messagesFetchKeyRef.current = key;
     setMessages([]);
     setHistoryLoaded(false);
     (async () => {
       try {
         const response = await api.getChatMessages(roomId);
         const history = (response?.list ?? []).map(normalizeChatMessage).reverse();
-        if (!cancelled) setMessages(history);
+        if (messagesFetchKeyRef.current === key) setMessages(history);
       } catch {
-        if (!cancelled) setMessages([]);
+        if (messagesFetchKeyRef.current === key) setMessages([]);
       } finally {
-        if (!cancelled) setHistoryLoaded(true);
+        if (messagesFetchKeyRef.current === key) setHistoryLoaded(true);
       }
     })();
-    return () => { cancelled = true; };
   }, [api, roomId]);
 
   useEffect(() => {
@@ -171,16 +179,19 @@ export default function ChatRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, member, historyLoaded, location.state, roomId, roomMeta]);
 
-  // 서버(백엔드 미구현)의 승인 응답을 아직 받을 수 없으므로 우선 낙관적으로 로컬 상태만 갱신한다.
-  // 백엔드 구현 후에는 /topic/chat/rooms/{roomId} 브로드캐스트로 최종 상태가 다시 내려온다.
+  // REST 요청 성공 시 서버가 처리 결과를 담은 새 메시지를 저장하고 /topic/chat/rooms/{roomId}로
+  // 브로드캐스트하므로(handleIncoming이 새 메시지로 append함), 여기서는 원본 제안 메시지의 상태만
+  // 낙관적으로 갱신하고, 요청이 실패하면 PENDING으로 롤백한다.
   async function handleAcceptOffer(messageId) {
     setMessages((current) =>
       current.map((message) => (message.messageId === messageId ? { ...message, offerStatus: "ACCEPTED" } : message))
     );
     try {
-      await acceptOffer(roomId, messageId);
+      await api.acceptOffer(roomId, messageId);
     } catch {
-      // 소켓 미연결 등으로 발행 자체가 실패해도 로컬 표시는 유지(백엔드 없이는 재확인 불가)
+      setMessages((current) =>
+        current.map((message) => (message.messageId === messageId ? { ...message, offerStatus: "PENDING" } : message))
+      );
     }
   }
 
@@ -189,9 +200,11 @@ export default function ChatRoom() {
       current.map((message) => (message.messageId === messageId ? { ...message, offerStatus: "REJECTED" } : message))
     );
     try {
-      await rejectOffer(roomId, messageId);
+      await api.rejectOffer(roomId, messageId);
     } catch {
-      // 소켓 미연결 등으로 발행 자체가 실패해도 로컬 표시는 유지(백엔드 없이는 재확인 불가)
+      setMessages((current) =>
+        current.map((message) => (message.messageId === messageId ? { ...message, offerStatus: "PENDING" } : message))
+      );
     }
   }
 

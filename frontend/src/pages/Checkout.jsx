@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
@@ -12,9 +12,13 @@ export default function Checkout() {
   const [item, setItem] = useState(null);
   const [buyerInfo, setBuyerInfo] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const checkoutFetchKeyRef = useRef("");
 
   useEffect(() => {
-    let cancelled = false;
+    const key = String(itemId);
+    if (checkoutFetchKeyRef.current === key) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    checkoutFetchKeyRef.current = key;
+
     setItem(null);
     setBuyerInfo(null);
     setNotFound(false);
@@ -22,7 +26,7 @@ export default function Checkout() {
     (async () => {
       try {
         const [itemDetail, myInfo] = await Promise.all([api.findItem(Number(itemId)), api.getMyInfo()]);
-        if (cancelled) return;
+        if (checkoutFetchKeyRef.current !== key) return;
         if (!itemDetail || typeof itemDetail !== "object") {
           setNotFound(true);
           return;
@@ -30,13 +34,11 @@ export default function Checkout() {
         setItem(normalizeItem(itemDetail, Number(itemId)));
         setBuyerInfo(normalizeMemberInfo(myInfo));
       } catch (error) {
-        if (cancelled) return;
+        if (checkoutFetchKeyRef.current !== key) return;
         setNotFound(true);
         setNotice(error.message || "구매 정보를 불러오지 못했습니다.");
       }
     })();
-
-    return () => { cancelled = true; };
   }, [api, itemId]);
 
   if (notFound) {

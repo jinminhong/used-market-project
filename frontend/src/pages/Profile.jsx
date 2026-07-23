@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeft, Store, Package, ShoppingBag, Heart, MessageCircle } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
@@ -9,25 +9,23 @@ export default function Profile() {
   const navigate = useNavigate();
   const [info, setInfo] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const apiRef = useRef(null);
 
   useEffect(() => {
-    let cancelled = false;
+    if (apiRef.current === api) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    apiRef.current = api;
     setInfo(null);
     setNotFound(false);
 
     (async () => {
       try {
         const data = await api.getMyInfo();
-        if (cancelled) return;
         setInfo(normalizeMemberInfo(data));
       } catch (error) {
-        if (cancelled) return;
         setNotFound(true);
         setNotice(error.message || "회원정보를 불러오지 못했습니다.");
       }
     })();
-
-    return () => { cancelled = true; };
   }, [api]);
 
   if (notFound) {
@@ -41,7 +39,9 @@ export default function Profile() {
 
   if (!info) return null;
 
-  const addressText = [info.address.city, info.address.street, info.address.zipcode].filter(Boolean).join(" ");
+  const addressText = info.address.roadAddress
+    ? `[${info.address.zonecode}] ${info.address.roadAddress} ${info.address.detailAddress}`.trim()
+    : "";
 
   return (
     <main className="page-shell narrow-page profile-page">

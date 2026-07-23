@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ImagePlus, X } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
@@ -14,6 +14,7 @@ export default function Editor() {
   const { api, member, run, loading, setNotice } = useSession();
   const [form, setForm] = useState(emptyForm);
   const [ready, setReady] = useState(!isEdit);
+  const fetchKeyRef = useRef("");
 
   useEffect(() => {
     if (!isEdit) {
@@ -22,13 +23,15 @@ export default function Editor() {
       return;
     }
 
-    let cancelled = false;
+    const key = String(itemId);
+    if (fetchKeyRef.current === key) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    fetchKeyRef.current = key;
 
     (async () => {
       try {
         const detail = await api.findItem(Number(itemId));
         const item = normalizeItem(detail, Number(itemId));
-        if (cancelled) return;
+        if (fetchKeyRef.current !== key) return;
         if (item.memberId !== member?.memberId) {
           navigate(`/items/${itemId}`, { replace: true });
           return;
@@ -46,13 +49,11 @@ export default function Editor() {
         });
         setReady(true);
       } catch (error) {
-        if (cancelled) return;
+        if (fetchKeyRef.current !== key) return;
         setNotice(error.message || "상품을 불러오지 못했습니다.");
         navigate("/", { replace: true });
       }
     })();
-
-    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, itemId, api]);
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
@@ -17,9 +17,14 @@ export default function Detail() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [wished, setWished] = useState(false);
   const [showOfferDialog, setShowOfferDialog] = useState(false);
+  const itemFetchKeyRef = useRef("");
+  const wishedFetchKeyRef = useRef("");
 
   useEffect(() => {
-    let cancelled = false;
+    const key = String(itemId);
+    if (itemFetchKeyRef.current === key) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    itemFetchKeyRef.current = key;
+
     setItem(null);
     setNotFound(false);
     setActiveImageIndex(0);
@@ -28,31 +33,31 @@ export default function Detail() {
     (async () => {
       try {
         const detail = await api.findItem(Number(itemId));
-        if (cancelled) return;
+        if (itemFetchKeyRef.current !== key) return;
         if (detail && typeof detail === "object") setItem(normalizeItem(detail, Number(itemId)));
         else setNotFound(true);
       } catch (error) {
-        if (cancelled) return;
+        if (itemFetchKeyRef.current !== key) return;
         setNotFound(true);
         setNotice(error.message || "상품을 불러오지 못했습니다.");
       }
     })();
-
-    return () => { cancelled = true; };
   }, [api, itemId]);
 
   useEffect(() => {
     if (!member || !item?.itemId) return;
-    let cancelled = false;
+    const key = `${item.itemId}:${member.memberId}`;
+    if (wishedFetchKeyRef.current === key) return;
+    wishedFetchKeyRef.current = key;
     (async () => {
       try {
         const result = await api.findWished(item.itemId);
-        if (!cancelled) setWished(result?.wished === true || result?.wished === "true");
+        if (wishedFetchKeyRef.current !== key) return;
+        setWished(result?.wished === true || result?.wished === "true");
       } catch {
         // 찜 여부 조회 실패는 조용히 무시하고 기본값(false) 유지
       }
     })();
-    return () => { cancelled = true; };
   }, [api, member, item?.itemId]);
 
   if (notFound) {

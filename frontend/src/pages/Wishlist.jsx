@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, Heart } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
@@ -9,6 +9,7 @@ import { Button } from "../components/ui/button.jsx";
 export default function Wishlist() {
   const { api, run, setNotice } = useSession();
   const [items, setItems] = useState(null);
+  const apiRef = useRef(null);
 
   async function handleRemove(itemId) {
     await run(async () => {
@@ -18,23 +19,20 @@ export default function Wishlist() {
   }
 
   useEffect(() => {
-    let cancelled = false;
+    if (apiRef.current === api) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    apiRef.current = api;
     setItems(null);
 
     (async () => {
       try {
         const data = await api.listWishlist();
-        if (cancelled) return;
         const list = Array.isArray(data) ? data : data?.list ?? [];
         setItems(list.map((item, index) => normalizeItem(item, item.itemId ?? index + 1)));
       } catch (error) {
-        if (cancelled) return;
         setItems([]);
         setNotice(error.message || "위시리스트를 불러오지 못했습니다.");
       }
     })();
-
-    return () => { cancelled = true; };
   }, [api]);
 
   return (

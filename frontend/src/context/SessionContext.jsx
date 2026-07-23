@@ -13,20 +13,21 @@ export function SessionProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const api = useMemo(() => createApi(useMock), [useMock]);
   const noticeTimerRef = useRef(null);
+  const initFetchedRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
+    if (initFetchedRef.current) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    initFetchedRef.current = true;
     (async () => {
       try {
         const info = await createApi(false).getMyInfo();
-        if (!cancelled) setMember(normalizeMemberInfo(info));
+        setMember(normalizeMemberInfo(info));
       } catch {
         // 세션 없음(비로그인) — 조용히 무시
       } finally {
-        if (!cancelled) setInitializing(false);
+        setInitializing(false);
       }
     })();
-    return () => { cancelled = true; };
   }, []);
 
   function setNotice(message) {

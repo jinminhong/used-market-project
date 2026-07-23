@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeMemberInfo } from "../api/normalize.js";
+import AddressSearchField from "../components/AddressSearchField.jsx";
 
-const emptyForm = { name: "", nickname: "", password: "", passwordConfirm: "", city: "", street: "", zipcode: "" };
+const emptyForm = { name: "", nickname: "", password: "", passwordConfirm: "", zonecode: "", roadAddress: "", jibunAddress: "", detailAddress: "" };
 
 export default function ProfileEdit() {
   const navigate = useNavigate();
@@ -13,34 +14,33 @@ export default function ProfileEdit() {
   const [ready, setReady] = useState(false);
   const [originalNickname, setOriginalNickname] = useState("");
   const [nicknameCheck, setNicknameCheck] = useState(null);
+  const apiRef = useRef(null);
 
   useEffect(() => {
-    let cancelled = false;
+    if (apiRef.current === api) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    apiRef.current = api;
 
     (async () => {
       try {
         const data = await api.getMyInfo();
         const info = normalizeMemberInfo(data);
-        if (cancelled) return;
         setForm({
           name: info.name,
           nickname: info.nickName,
           password: "",
           passwordConfirm: "",
-          city: info.address.city,
-          street: info.address.street,
-          zipcode: info.address.zipcode,
+          zonecode: info.address.zonecode,
+          roadAddress: info.address.roadAddress,
+          jibunAddress: info.address.jibunAddress,
+          detailAddress: info.address.detailAddress,
         });
         setOriginalNickname(info.nickName);
         setReady(true);
       } catch (error) {
-        if (cancelled) return;
         setNotice(error.message || "회원정보를 불러오지 못했습니다.");
         navigate("/profile", { replace: true });
       }
     })();
-
-    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api]);
 
@@ -48,6 +48,10 @@ export default function ProfileEdit() {
     const { name, value } = event.target;
     setForm((current) => ({ ...current, [name]: value }));
     if (name === "nickname") setNicknameCheck(null);
+  }
+
+  function handleAddressSearch(address) {
+    setForm((current) => ({ ...current, ...address }));
   }
 
   async function checkNickname() {
@@ -79,7 +83,12 @@ export default function ProfileEdit() {
       const payload = {
         name: form.name,
         nickname: form.nickname,
-        address: { city: form.city, street: form.street, zipcode: form.zipcode },
+        address: {
+          zonecode: form.zonecode,
+          roadAddress: form.roadAddress,
+          jibunAddress: form.jibunAddress,
+          detailAddress: form.detailAddress,
+        },
       };
       if (form.password.trim()) payload.password = form.password;
       await api.updateMyInfo(payload);
@@ -108,11 +117,14 @@ export default function ProfileEdit() {
           )}
           <input name="password" type="password" value={form.password} onChange={change} placeholder="새 비밀번호 (변경 시에만 입력)" />
           <input name="passwordConfirm" type="password" value={form.passwordConfirm} onChange={change} placeholder="새 비밀번호 확인" />
-          <div className="split-fields">
-            <input name="city" value={form.city} onChange={change} placeholder="시/도" />
-            <input name="street" value={form.street} onChange={change} placeholder="도로명 주소" />
-          </div>
-          <input name="zipcode" value={form.zipcode} onChange={change} placeholder="우편번호" />
+          <AddressSearchField
+            zonecode={form.zonecode}
+            roadAddress={form.roadAddress}
+            detailAddress={form.detailAddress}
+            onSearch={handleAddressSearch}
+            onDetailChange={change}
+            disabled={loading}
+          />
           <button disabled={loading}>저장</button>
         </form>
         <button className="text-button" type="button" onClick={() => navigate(searchParams.get("next") || "/profile")}>취소</button>
