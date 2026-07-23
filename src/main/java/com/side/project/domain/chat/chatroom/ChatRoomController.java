@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
+import org.springframework.data.repository.query.Param;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -62,5 +63,29 @@ public class ChatRoomController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PostMapping("/{roomId}/offer/{messageId}/reject")
+    public ResponseEntity<ChatRoomAndMessageDto> rejectOffer(@Login LoginMember loginMember,
+                                                             @PathVariable Long roomId,
+                                                             @PathVariable Long messageId) {
+        ChatRoomAndMessageDto response = chatRoomService.rejectOffer(roomId, loginMember.getMemberId(), messageId);
 
+        messagingTemplate.convertAndSend(
+                "/topic/chat/rooms/" + response.room().roomId(),
+                response
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/{roomId}/offer/{messageId}/accept")
+    public ResponseEntity<ChatRoomAndMessageDto> acceptOffer(@Login LoginMember loginMember,
+                                                             @PathVariable Long roomId,
+                                                             @PathVariable Long messageId) {
+        ChatRoomAndMessageDto response = chatRoomService.acceptOffer(roomId, loginMember.getMemberId(), messageId);
+
+        messagingTemplate.convertAndSend(
+                "/topic/chat/rooms/" + response.room().roomId(),
+                response
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
 }

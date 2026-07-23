@@ -22,7 +22,7 @@
 
 ### 5. `Orders` 엔티티/리포지토리에 상태전이 구현에 필요한 최소한의 골격이 없다
 
-- `Orders`는 `id`/`buyer`/`item`/`orderStatus` 4개 필드뿐이라 협상가(`agreedPrice`)를 저장할 곳이 없다.
+- ~~`Orders`는 `id`/`buyer`/`item`/`orderStatus` 4개 필드뿐이라 협상가(`agreedPrice`)를 저장할 곳이 없다.~~ **해결됨** — `Orders.agreedPrice`(Integer) 필드가 추가되어 즉시구매(`item.getPrice()`)/오퍼 수락(`ChatMessage.offeredPrice`) 양쪽 모두 협상 성사 가격을 저장한다(`OrdersService.save`/`createOrders`, `docs/chat-review.md` 참고). `OrdersResponseDto`/QueryDSL 프로젝션(`OrdersRepositoryImpl`)에도 노출되어 있다. 단, 이 필드가 채워지는 진입점은 이 문서와 `ORDER_LIFECYCLE_GUIDE.md`가 상정한 `createNegotiatedOrder`가 아니라 실제로는 `ChatRoomService.acceptOffer` → `OrdersService.createOrders`다.
 - `accept()`/`pay()`/`ship()`/`confirm()`/`cancel()` 같은 상태 검증 포함 전이 메서드가 없다.
 - `orderId` 기준 fetch-join 조회가 없다 — `Orders.buyer`/`Orders.item`이 둘 다 `LAZY`라서 plain `findById`로 권한 체크를 하면 추가 쿼리가 2~3번 더 나간다.
 - 자동취소 스케줄러용 쿼리도, `@EnableScheduling`도 없다.
@@ -33,7 +33,7 @@
 
 ### 7. 목록 조회 필터가 상태전이 확장을 전제하지 않은 하드코딩이다
 
-`findAllPurchases`/`findAllSales`가 `orderStatus.in(COMPLETED, PAY_COMPLETED)`로 고정되어 있어, 상태전이가 추가되면 `REQUESTED`/`ACCEPTED`/`SHIPPING` 주문이 목록에서 아예 누락된다.
+`findAllPurchases`/`findAllSales`가 `orderStatus.in(COMPLETED, PAY_COMPLETED)`로 고정되어 있어, 상태전이가 추가되면 `REQUESTED`/`ACCEPTED`/`SHIPPING` 주문이 목록에서 아예 누락된다. **이미 실제로 발생 중** — 채팅 오퍼 수락(`ChatRoomService.acceptOffer`)이 `OrderStatus.ACCEPTED` 주문을 생성하므로, 이 주문은 구매자의 `GET /api/orders/purchases`에는 전혀 나타나지 않고 판매자도 `GET /api/orders/sales?status=ACCEPTED`로 명시적으로 필터링해야만 볼 수 있다(`docs/chat-review.md` 5번 참고). `agreedPrice` 필드는 채워지지만 이 필터 문제 때문에 기본 화면에서는 보이지 않는다.
 
 ## 잘 되어 있는 부분
 
@@ -46,11 +46,11 @@
 ## 다음에 손대면 좋을 순서
 
 1. **`Item.status` 뒷문 제거를 최우선으로 한다** — `ItemUpdateDto.status` 필드와 `Item.updateItem`의 상태 분기를 삭제. 이걸 먼저 안 하면 아래에서 아무리 정교한 상태 머신을 만들어도 우회로가 남는다.
-2. **`Orders` 엔티티 확장** — `agreedPrice` 필드, `accept()`/`pay()`/`ship()`/`confirm()`/`cancel()` 전이 메서드 추가. `OrderStatus`에 `SHIPPING` 추가. 예외 3종 신설 후 매핑.
+2. **`Orders` 엔티티 확장** — ~~`agreedPrice` 필드~~(구현됨, 위 5번 참고), `accept()`/`pay()`/`ship()`/`confirm()`/`cancel()` 전이 메서드 추가. `OrderStatus`에 `SHIPPING` 추가. 예외 3종 신설 후 매핑.
 3. **`OrdersRepository`에 fetch-join 조회 메서드 추가** — `orderId` 하나로 `buyer`/`item`/`item.seller`까지 한 번에 가져오는 쿼리.
 4. **`OrdersService.changeStatus` + `OrdersController` PATCH 구현** — `ORDER_LIFECYCLE_GUIDE.md` 3~4절 그대로.
 5. **`ItemException`의 404 고정 매핑 문제 정리** — 즉시구매 에러(404 vs 409)를 구분할 수 있도록 예외 분리, 문서가 약속한 409와 실제 코드를 일치시킨다.
 6. **락 타임아웃 예외 매핑 추가** — `PessimisticLockException`/`LockTimeoutException` → 409/503.
-7. **목록 조회 필터 확장 + DTO 필드 추가** — `orderStatus.in(...)`을 CANCELED만 제외하는 형태로 넓히고 `orderStatus`/`agreedPrice` 노출.
+7. **목록 조회 필터 확장** — `orderStatus.in(...)`을 CANCELED만 제외하는 형태로 넓혀 `ACCEPTED` 등도 기본 목록에 노출(DTO의 `orderStatus`/`agreedPrice` 필드 자체는 이미 노출되어 있음, 위 5/7번 참고).
 8. **자동취소 스케줄러는 마지막** — 상태전이 자체가 동작해야 의미가 있으므로 가장 후순위.
 </content>

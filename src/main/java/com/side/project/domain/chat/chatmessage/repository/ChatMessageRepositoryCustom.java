@@ -1,5 +1,6 @@
 package com.side.project.domain.chat.chatmessage.repository;
 
+import com.side.project.domain.chat.chatmessage.OfferStatus;
 import com.side.project.domain.chat.chatmessage.dto.ChatMessageDto;
 import com.side.project.domain.chat.chatmessage.dto.ChatMessageResponse;
 import org.springframework.data.domain.Pageable;

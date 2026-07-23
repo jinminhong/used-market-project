@@ -7,6 +7,7 @@ import com.side.project.web.exception.login.LoginFailException;
 import com.side.project.web.exception.login.UnauthorizedException;
 import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.member.MemberException;
+import com.side.project.web.exception.orders.OrdersException;
 import com.side.project.web.exception.wishlist.WishListException;
 import com.side.project.web.exception.wishlist.WishListNotFoundException;
 import org.springframework.http.HttpStatus;
@@ -62,6 +63,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ChatMessageException.class)
     public ResponseEntity chatMessageException(ChatMessageException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
+
+    @ExceptionHandler(OrdersException.class)
+    public ResponseEntity ordersException(OrdersException e) {
+        return ResponseEntity.status(e.getHttpStatus()).body(e.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

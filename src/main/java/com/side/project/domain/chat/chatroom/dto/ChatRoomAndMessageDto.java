@@ -14,4 +14,11 @@ public record ChatRoomAndMessageDto(
                 ChatMessageResponse.from(message)
         );
     }
+
+    public static ChatRoomAndMessageDto fromAccepted(ChatRoom chatRoom, ChatMessage message, Long orderId) {
+        return new ChatRoomAndMessageDto(
+                ChatRoomResponse.from(chatRoom),
+                ChatMessageResponse.from(message, orderId)
+        );
+    }
 }

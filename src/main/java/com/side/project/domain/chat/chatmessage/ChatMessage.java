@@ -69,4 +69,39 @@ public class ChatMessage {
         this.offeredPrice = offeredPrice;
         this.offerStatus = OfferStatus.PENDING;
     }
+
+    public void rejectOfferMessage(ChatRoom chatRoom,
+                                   Member sender,
+                                   String content,
+                                   MessageType messageType,
+                                   int offeredPrice) {
+        this.chatRoom = chatRoom;
+        this.sender = sender;
+        this.content = content;
+        this.sentAt = LocalDateTime.now();
+        this.messageType = messageType;
+        this.offeredPrice = offeredPrice;
+        this.offerStatus = OfferStatus.REJECTED;
+    }
+
+    public void acceptOfferMessage(ChatRoom chatRoom,
+                                   Member sender,
+                                   String content,
+                                   MessageType messageType,
+                                   int offeredPrice) {
+        this.chatRoom = chatRoom;
+        this.sender = sender;
+        this.content = content;
+        this.sentAt = LocalDateTime.now();
+        this.messageType = messageType;
+        this.offeredPrice = offeredPrice;
+        this.offerStatus = OfferStatus.ACCEPTED;
+    }
+
+    public void changeStatusToReject() {
+        this.offerStatus = OfferStatus.REJECTED;
+    }
+    public void changeStatusToAccept() {
+        this.offerStatus = OfferStatus.ACCEPTED;
+    }
 }

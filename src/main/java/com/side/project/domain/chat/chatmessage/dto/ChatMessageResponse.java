@@ -15,10 +15,18 @@ public record ChatMessageResponse(
         MessageType messageType,
         Integer offeredPrice,
         OfferStatus offerStatus,
-        LocalDateTime sentAt
+        LocalDateTime sentAt,
+        Long orderId
 ) {
     public static ChatMessageResponse from(
             ChatMessage message
+    ) {
+        return from(message, null);
+    }
+
+    public static ChatMessageResponse from(
+            ChatMessage message,
+            Long orderId
     ) {
         return new ChatMessageResponse(
                 message.getId(),
@@ -29,7 +37,8 @@ public record ChatMessageResponse(
                 message.getMessageType(),
                 message.getOfferedPrice(),
                 message.getOfferStatus(),
-                message.getSentAt()
+                message.getSentAt(),
+                orderId
         );
     }
 }

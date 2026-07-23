@@ -44,10 +44,6 @@ public class ChatMessageService {
 
     @Transactional
     public ChatMessage sendOffer(ChatRoom chatRoom, Member buyer , ChatRoomRequest request) {
-        if (!chatRoom.containsMember(buyer.getId())) {
-            throw new ChatRoomException(HttpStatus.FORBIDDEN,"해당 채팅방에 참여할 수 없습니다.");
-        }
-
         String message = request.content().trim();
         if (message.isBlank()) {
             throw new ChatMessageException("메세지 내용을 입력해야 합니다.");
@@ -58,5 +54,38 @@ public class ChatMessageService {
         chatMessageRepository.save(chatMessage);
         chatRoom.updateLastMessageAt(chatMessage.getSentAt());
         return chatMessage;
+    }
+
+    @Transactional
+    public ChatMessage rejectOffer(ChatRoom chatRoom , Member seller , Long messageId) {
+        ChatMessage offerChatMessage = getChatMessageById(messageId);
+        offerChatMessage.changeStatusToReject();
+
+        String message = "거절합니다.";
+        ChatMessage chatMessage = new ChatMessage();
+        chatMessage.rejectOfferMessage(chatRoom,seller,message,MessageType.OFFER , offerChatMessage.getOfferedPrice());
+        chatMessageRepository.save(chatMessage);
+
+        return chatMessage;
+    }
+
+    @Transactional
+    public ChatMessage acceptOffer(ChatRoom chatRoom, Member seller, ChatMessage offerChatMessage) {
+        offerChatMessage.changeStatusToAccept();
+
+        String message = "제안을 수락합니다.";
+        ChatMessage chatMessage = new ChatMessage();
+        chatMessage.acceptOfferMessage(chatRoom,seller,message,MessageType.OFFER , offerChatMessage.getOfferedPrice());
+        chatMessageRepository.save(chatMessage);
+        chatRoom.updateLastMessageAt(chatMessage.getSentAt());
+
+        Long itemId = chatRoom.getItem().getId();
+        chatMessageRepository.rejectOtherOffers(itemId,offerChatMessage.getId());
+
+        return chatMessage;
+    }
+
+    public ChatMessage getChatMessageById(Long messageId) {
+        return chatMessageRepository.findById(messageId).orElseThrow(() -> new ChatMessageException("메세지를 찾을 수 없습니다."));
     }
 }

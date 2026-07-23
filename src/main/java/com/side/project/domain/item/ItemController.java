@@ -42,7 +42,6 @@ public class ItemController {
     //상품 상세
     @GetMapping("/items/{itemId}")
     public ResponseEntity<ItemDto> item(@PathVariable Long itemId) {
-        // TODO: Call itemService.findById(itemId) and add it as "item".
         ItemDto itemDto = itemService.findByIdToDto(itemId);
         return ResponseEntity.status(HttpStatus.OK).body(itemDto);
     }

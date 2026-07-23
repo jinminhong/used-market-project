@@ -1,11 +1,13 @@
 package com.side.project.domain.chat.chatmessage.repository;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import com.side.project.domain.chat.chatmessage.OfferStatus;
 import com.side.project.domain.chat.chatmessage.QChatMessage;
 import com.side.project.domain.chat.chatmessage.dto.ChatMessageDto;
 import com.side.project.domain.chat.chatmessage.dto.QChatMessageDto;
 import com.side.project.domain.chat.chatroom.QChatRoom;
 import com.side.project.domain.member.QMember;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -21,6 +23,7 @@ import static com.side.project.domain.member.QMember.*;
 @RequiredArgsConstructor
 public class ChatMessageRepositoryImpl implements ChatMessageRepositoryCustom{
 
+    private final EntityManager em;
     private final JPAQueryFactory queryFactory;
 
     @Override
@@ -47,4 +50,5 @@ public class ChatMessageRepositoryImpl implements ChatMessageRepositoryCustom{
 
         return new SliceImpl<>(chatMessages, pageable, hasNext);
     }
+
 }

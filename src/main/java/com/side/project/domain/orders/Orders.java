@@ -31,9 +31,24 @@ public class Orders extends BaseEntity {
     @Column(nullable = false, length = 20)
     private OrderStatus orderStatus;
 
-    public void createOrders(Member buyer, Item item, OrderStatus orderStatus) {
+    @Column(length = 50)
+    private String trackingCompany;
+
+    @Column(length = 50)
+    private String trackingNumber;
+
+    @Column(name = "agreed_price")
+    private Integer agreedPrice;
+
+    public void createOrders(Member buyer, Item item, OrderStatus orderStatus, Integer agreedPrice) {
         this.buyer = buyer;
         this.item = item;
         this.orderStatus = orderStatus;
+        this.agreedPrice = agreedPrice;
+    }
+
+    public void registerTracking(String trackingCompany, String trackingNumber) {
+        this.trackingCompany = trackingCompany;
+        this.trackingNumber = trackingNumber;
     }
 }

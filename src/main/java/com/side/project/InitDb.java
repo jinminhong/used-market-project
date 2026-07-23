@@ -33,7 +33,7 @@ public class InitDb implements ApplicationRunner {
                     "member" + i,
                     "1234",
                     "nickname" + i,
-                    new Address("city" + i, "street" + i, String.format("%05d", i))
+                    new Address(String.format("%05d", i), "테헤란로 " + i + "길", "역삼동 " + i, "상세주소 " + i)
             );
 
             em.persist(member);
