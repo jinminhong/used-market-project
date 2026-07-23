@@ -279,6 +279,15 @@ export function createApi(useMock) {
     if (path === "/chat/rooms" && method === "POST") {
       throw new Error("Mock 모드에서는 채팅 기능을 사용할 수 없습니다.");
     }
+    if (path.startsWith("/chat/rooms/me") && method === "GET") {
+      throw new Error("Mock 모드에서는 채팅 기능을 사용할 수 없습니다.");
+    }
+    if (/^\/chat\/rooms\/\d+/.test(path) && method === "GET") {
+      throw new Error("Mock 모드에서는 채팅 기능을 사용할 수 없습니다.");
+    }
+    if (path === "/chat/rooms/offer" && method === "POST") {
+      throw new Error("Mock 모드에서는 채팅 기능을 사용할 수 없습니다.");
+    }
     if (path === "/members/me" && method === "GET") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
       return {
@@ -314,6 +323,7 @@ export function createApi(useMock) {
 
   return {
     login: (data) => request("/login", { method: "POST", body: JSON.stringify(data) }),
+    logout: () => request("/logout", { method: "POST" }),
     signup: (data) => request("/members", { method: "POST", body: JSON.stringify(data) }),
     checkLoginId: (loginId) => request(`/members/check-id?loginId=${encodeURIComponent(loginId)}`),
     checkNickname: (nickname) => request(`/members/check-nickname?nickname=${encodeURIComponent(nickname)}`),
@@ -347,5 +357,9 @@ export function createApi(useMock) {
     removeWishlist: (itemId) => request(`/wishlist/${itemId}`, { method: "DELETE" }),
     findWished: (itemId) => request(`/wishlist/${itemId}`),
     createChatRoom: (itemId) => request("/chat/rooms", { method: "POST", body: JSON.stringify({ itemId }) }),
+    listChatRooms: (page = 0, size = 20) => request(`/chat/rooms/me?page=${page}&size=${size}`),
+    getChatMessages: (roomId, page = 0, size = 30) => request(`/chat/rooms/${roomId}?page=${page}&size=${size}`),
+    createOffer: (itemId, content, offeredPrice) =>
+      request("/chat/rooms/offer", { method: "POST", body: JSON.stringify({ itemId, content, offeredPrice }) }),
   };
 }

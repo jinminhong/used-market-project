@@ -29,4 +29,13 @@ public class LoginController {
         session.setAttribute(SessionConst.LOGIN_MEMBER,loginMember);
         return ResponseEntity.status(HttpStatus.OK).body(loginMember);
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+        HttpSession session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
+        }
+        return ResponseEntity.noContent().build();
+    }
 }

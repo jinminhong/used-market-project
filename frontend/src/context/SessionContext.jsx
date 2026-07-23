@@ -1,5 +1,6 @@
-import { createContext, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createApi } from "../api/client.js";
+import { normalizeMemberInfo } from "../api/normalize.js";
 
 const NOTICE_DURATION = 3000;
 const SessionContext = createContext(null);
@@ -7,10 +8,26 @@ const SessionContext = createContext(null);
 export function SessionProvider({ children }) {
   const [useMock, setUseMock] = useState(false);
   const [member, setMember] = useState(null);
+  const [initializing, setInitializing] = useState(true);
   const [notice, setNoticeState] = useState("");
   const [loading, setLoading] = useState(false);
   const api = useMemo(() => createApi(useMock), [useMock]);
   const noticeTimerRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const info = await createApi(false).getMyInfo();
+        if (!cancelled) setMember(normalizeMemberInfo(info));
+      } catch {
+        // 세션 없음(비로그인) — 조용히 무시
+      } finally {
+        if (!cancelled) setInitializing(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   function setNotice(message) {
     if (noticeTimerRef.current) {
@@ -39,12 +56,19 @@ export function SessionProvider({ children }) {
     }
   }
 
-  function logout() {
+  async function logout() {
+    if (!useMock) {
+      try {
+        await api.logout();
+      } catch {
+        // 서버 로그아웃 실패해도 프론트 상태는 정리한다
+      }
+    }
     setMember(null);
     setNotice("");
   }
 
-  const value = { useMock, setUseMock, member, setMember, notice, setNotice, loading, setLoading, api, run, logout };
+  const value = { useMock, setUseMock, member, setMember, initializing, notice, setNotice, loading, setLoading, api, run, logout };
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

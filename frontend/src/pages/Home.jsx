@@ -145,6 +145,7 @@ export default function Home() {
             value={search}
             onChange={(event) => updateParam("q", event.target.value)}
             placeholder="상품, 설명, 셀러 검색"
+            aria-label="상품, 설명, 셀러 검색"
           />
         </div>
       </section>
@@ -153,9 +154,11 @@ export default function Home() {
           <ItemCard key={`${item.itemId ?? item.name}-${index}`} item={item} />
         ))}
       </section>
-      {items.length === 0 && <p className="quiet-message">조건에 맞는 상품이 없습니다.</p>}
-      {loadingMore && <p className="quiet-message">상품을 더 불러오는 중입니다.</p>}
-      {!hasNextItems && items.length > 0 && <p className="quiet-message">마지막 상품까지 모두 봤습니다.</p>}
+      <div aria-live="polite">
+        {items.length === 0 && <p className="quiet-message">조건에 맞는 상품이 없습니다.</p>}
+        {loadingMore && <p className="quiet-message">상품을 더 불러오는 중입니다.</p>}
+        {!hasNextItems && items.length > 0 && <p className="quiet-message">마지막 상품까지 모두 봤습니다.</p>}
+      </div>
     </main>
   );
 }

@@ -5,7 +5,7 @@
   --color-surface-alt: #f5f5f4;
   --color-text: #111111;
   --color-text-muted: #6b6b6b;
-  --color-text-subtle: #9a9a9a;
+  --color-text-subtle: #767676; /* 흰 배경 대비 WCAG AA(4.5:1) 충족 — 실제로 셀러명/타임스탬프 등 본문 텍스트에 쓰이고 있어 장식용 톤(#9a9a9a)으로는 대비가 부족했음 */
   --color-border: #e6e5e2;
   --color-accent: #111111;
   --color-accent-contrast: #ffffff;

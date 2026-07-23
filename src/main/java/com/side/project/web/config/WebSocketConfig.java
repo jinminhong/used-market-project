@@ -1,5 +1,6 @@
 package com.side.project.web.config;
 
+import com.side.project.web.interceptor.LoginHandshakeInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
@@ -18,6 +19,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.addEndpoint("/ws-chat")
                 .setAllowedOriginPatterns("http://localhost:5173")
                 .addInterceptors(
+                        new LoginHandshakeInterceptor(),
                         new HttpSessionHandshakeInterceptor()
                 );
     }

@@ -13,7 +13,7 @@ function formatRelativeTime(iso) {
   return `${days}일 전`;
 }
 
-export default function ChatRoomListItem({ room }) {
+export default function ChatRoomListItem({ room, unreadCount = 0 }) {
   return (
     <Link to={`/chat/${room.roomId}`} className="chat-room-item">
       <span className="chat-room-thumb">
@@ -27,6 +27,7 @@ export default function ChatRoomListItem({ room }) {
         <em className="chat-room-counterpart">@{room.counterpart?.nickName || "상대방"}</em>
         <span className="chat-room-preview">{room.lastMessage || "대화를 시작해보세요."}</span>
       </span>
+      {unreadCount > 0 && <span className="chat-room-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
     </Link>
   );
 }

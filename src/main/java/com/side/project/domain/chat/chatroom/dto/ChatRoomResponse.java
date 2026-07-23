@@ -8,7 +8,7 @@ public record ChatRoomResponse(
         Long buyerId,
         Long sellerId,
         String itemName,
-        String sellerNicName,
+        String sellerNickName,
         String buyerNickName
 ) {
 

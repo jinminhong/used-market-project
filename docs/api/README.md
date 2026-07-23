@@ -1,8 +1,8 @@
 # API 명세서 인덱스
 
-이 디렉토리는 URL 분기(도메인)별로 나눈 REST API 계약 문서입니다. 코드를 직접 읽지 않아도 "프론트가 무엇을 보내고, 무엇을 받고 싶어하는지"를 알 수 있도록, **모든 엔드포인트를 요청 / 성공 응답 / 에러 응답 예시 JSON**으로 정리했습니다. 아직 백엔드에 없는 기능(찜 해제, 주문 상태전이, 채팅 등)도 같은 형식으로 "제안 계약"을 작성해 두었습니다.
+이 디렉토리는 URL 분기(도메인)별로 나눈 REST API 계약 문서입니다. 구현된 엔드포인트는 핵심 요청/응답 형태와 알려진 이슈만 간단히 정리했고, 아직 백엔드에 없는 기능(현재는 주문 상태전이만 해당)은 같은 형식으로 "제안 계약"을 작성해 두었습니다. 각 도메인을 실제로 더 개선하려면 아래 "도메인별 코드리뷰" 문서를 먼저 확인하세요.
 
-이 문서가 이 저장소의 API 형태에 대한 기준 문서입니다. `docs/REST_API_FRONTEND_PLAN.md`는 초기 설계 초안이라 참고하지 마세요. `docs/BACKEND_ROADMAP.txt`는 미구현 기능의 배경/설계 의도를 설명하는 로드맵 문서이며, 여기 있는 "미구현(제안)" 항목들의 근거 자료입니다.
+이 문서가 이 저장소의 API 형태에 대한 기준 문서입니다. `docs/REST_API_FRONTEND_PLAN.md`는 초기 설계 초안이라 참고하지 마세요. `docs/BACKEND_ROADMAP.txt`는 위시리스트/채팅이 아직 없던 시점의 로드맵이라 이제는 대부분 낡았습니다(두 도메인 모두 구현 완료) — 현재 남아있는 개선 방향은 아래 "도메인별 코드리뷰" 문서들을 기준으로 삼으세요.
 
 ## 문서 읽는 법
 
@@ -45,17 +45,31 @@
 - 인증: Spring Security/JWT 없음. `HttpSession` 기반 수제 로그인(`web/login`). 세션이 필요한 요청은 `fetch`에 `credentials: "include"`가 있어야 함.
 - 인터셉터: `web/interceptor/LoginCheckInterceptor` + `web/config/WebConfig`가 `/**` 전체를 대상으로 동작(order 1).
   - `excludePathPatterns`: `/`, `/api/login`, `/api/logout`, `/api/members`, `/api/members/check-id`, `/api/members/check-nickname`, `/api/members/*/shop`, `/css/**`, `/error`, `/api/images/**`
-  - 추가 하드코딩 규칙: **HTTP method가 GET이고 요청 URI가 `/api/items`로 시작하면** 로그인 없이 통과. 문자열 접두사 비교라 `AntPathMatcher` 기반이 아니므로, 새 경로 추가 시 의도치 않게 공개될 수 있음.
+  - 추가 하드코딩 규칙: **HTTP method가 GET이고 요청 URI가 `/api/items` 또는 `/api/items/**`에 매치하면** 로그인 없이 통과(`AntPathMatcher` 기반, `excludePathPatterns`가 아니라 인터셉터 내부 코드로 처리됨).
+- 세션: 타임아웃 `server.servlet.session.timeout=7d`(`application.properties`). 로그아웃은 `POST /api/logout`이 세션을 무효화한다.
 - 페이징 응답 패턴: 목록 API는 대부분 `{"list": [...], "hasNext": boolean}` 형태(Slice 방식, `total`/`totalPages` 없음).
 
 ## 도메인별 문서
 
 | 파일 | URL 분기 | 상태 |
 |---|---|---|
-| [auth.md](./auth.md) | `/api/login`, `/api/logout` | 로그인 구현됨, 로그아웃 미구현(제안) |
+| [auth.md](./auth.md) | `/api/login`, `/api/logout` | 구현됨 |
 | [members.md](./members.md) | `/api/members/**` | 구현됨 |
 | [items.md](./items.md) | `/api/items/**` | 구현됨 |
 | [images.md](./images.md) | `/api/images/**` | 구현됨 |
-| [orders.md](./orders.md) | `/api/orders/**` | 즉시구매만 구현됨, 상태전이 미구현(제안) |
-| [wishlist.md](./wishlist.md) | `/api/wishlist/**` | 조회/추가만 구현됨, 삭제 미구현(제안) |
-| [chat.md](./chat.md) | `/api/items/{itemId}/chatrooms`, `/api/chatrooms/**`, STOMP | 전부 미구현(제안) — 코드 자체가 없음 |
+| [orders.md](./orders.md) | `/api/orders/**` | 즉시구매/목록 구현됨, 상태전이 미구현(제안) |
+| [wishlist.md](./wishlist.md) | `/api/wishlist/**` | 조회/추가/해제 전부 구현됨 |
+| [chat.md](./chat.md) | `/api/chat/rooms/**`, STOMP | 채팅방 생성/목록/이력 + 실시간 메시지 + 가격 제안 생성 구현됨, 제안 수락/거절만 미구현 |
+
+## 도메인별 코드리뷰 (다음에 나아가야 할 방향)
+
+각 도메인의 실제 코드를 읽고 정리한 리뷰 문서. 계약(요청/응답)은 위 `docs/api/*.md`가, "무엇을 더 고쳐야 하는가"는 아래 문서가 담당한다.
+
+| 파일 | 도메인 |
+|---|---|
+| [auth-review.md](../auth-review.md) | 로그인/세션 |
+| [members-review.md](../members-review.md) | 회원 |
+| [items-review.md](../items-review.md) | 상품 + 이미지 |
+| [orders-review.md](../orders-review.md) | 구매/판매(주문) |
+| [wishlist-review.md](../wishlist-review.md) | 위시리스트 |
+| [chat-review.md](../chat-review.md) | 채팅(WebSocket/STOMP) |

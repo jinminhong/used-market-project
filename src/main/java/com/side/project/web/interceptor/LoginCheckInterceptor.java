@@ -10,16 +10,21 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 public class LoginCheckInterceptor implements HandlerInterceptor {
+
+    private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String method = request.getMethod();
         String requestURI = request.getRequestURI();
 
-        if (method.equals("GET") && requestURI.startsWith("/api/items")){ //get으로 보낸 상품 조회는 로그인 없이 허용
+        // get으로 보낸 상품 조회는 로그인 없이 허용 (startsWith는 /api/itemsFoo 같은 무관한 경로까지 오탐하므로 AntPathMatcher로 정확히 매칭)
+        if (method.equals("GET") &&
+                (PATH_MATCHER.match("/api/items", requestURI) || PATH_MATCHER.match("/api/items/**", requestURI))) {
             return true;
         }
 

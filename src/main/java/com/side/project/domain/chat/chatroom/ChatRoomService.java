@@ -1,11 +1,11 @@
 package com.side.project.domain.chat.chatroom;
 
+import com.side.project.domain.chat.chatmessage.ChatMessage;
+import com.side.project.domain.chat.chatmessage.ChatMessageService;
 import com.side.project.domain.chat.chatmessage.dto.ChatMessageDto;
 import com.side.project.domain.chat.chatmessage.dto.PageMessageResponseDto;
 import com.side.project.domain.chat.chatmessage.repository.ChatMessageRepository;
-import com.side.project.domain.chat.chatroom.dto.ChatRoomDto;
-import com.side.project.domain.chat.chatroom.dto.ChatRoomResponse;
-import com.side.project.domain.chat.chatroom.dto.PageChatRoomResponse;
+import com.side.project.domain.chat.chatroom.dto.*;
 import com.side.project.domain.chat.chatroom.repository.ChatRoomRepository;
 import com.side.project.domain.item.Item;
 import com.side.project.domain.item.repository.ItemRepository;
@@ -32,6 +32,7 @@ public class ChatRoomService {
     private final ItemRepository itemRepository;
     private final MemberRepository memberRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final ChatMessageService chatMessageService;
 
 
     @Transactional
@@ -43,10 +44,11 @@ public class ChatRoomService {
             throw new ChatRoomException(HttpStatus.CONFLICT,"본인이 등록한 상품에는 문의할 수 없습니다.");
         }
 
+        Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+
         return chatRoomRepository.findChatRoomByItemAndBuyer(itemId, buyerId)
                 .map(ChatRoomResponse::from)
                 .orElseGet(() -> {
-                    Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
                     ChatRoom chatRoom = new ChatRoom(item, buyer);
                     chatRoomRepository.save(chatRoom);
                     return ChatRoomResponse.from(chatRoom);
@@ -66,6 +68,27 @@ public class ChatRoomService {
         return new PageChatRoomResponse(content, chatRooms.hasNext());
     }
 
+    @Transactional
+    public ChatRoomAndMessageDto createOffer(Long itemId, Long buyerId, ChatRoomRequest request) {
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+
+        Long sellerId = item.getSeller().getId();
+        if (sellerId.equals(buyerId)) {
+            throw new ChatRoomException(HttpStatus.CONFLICT,"본인이 등록한 상품에는 문의할 수 없습니다.");
+        }
+
+        Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+        ChatRoom chatRoom = chatRoomRepository.findChatRoomByItemAndBuyer(itemId, buyerId)
+                .orElseGet(() -> {
+                    ChatRoom chatRoom1 = new ChatRoom(item, buyer);
+                    chatRoomRepository.save(chatRoom1);
+                    return chatRoom1;
+                });
+
+        ChatMessage chatMessage = chatMessageService.sendOffer(chatRoom, buyer, request);
+        return ChatRoomAndMessageDto.from(chatRoom, chatMessage);
+    }
+
     public PageMessageResponseDto getMessages(Long roomId, Long memberId, Pageable pageable) {
         ChatRoom chatRoom = chatRoomRepository.chatRoomFetchJoinItem(roomId).orElseThrow(() -> new ChatRoomException(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."));
 
@@ -77,5 +100,4 @@ public class ChatRoomService {
 
         return new PageMessageResponseDto(messages.getContent(), messages.hasNext());
     }
-
 }

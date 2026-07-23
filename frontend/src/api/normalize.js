@@ -73,24 +73,32 @@ export function normalizeChatRoom(raw) {
   return {
     roomId: raw.roomId ?? raw.id ?? null,
     itemId: raw.itemId ?? null,
+    itemName: raw.itemName ?? "상품 정보 없음",
+    itemImageUrl: imageUrlFromThumbnail(raw.storedFilename) || defaultImage(),
     buyerId: raw.buyerId ?? null,
     sellerId: raw.sellerId ?? null,
+    counterpart: { nickName: raw.counterPartNickName ?? "상대방" },
+    lastMessage: raw.lastMessage ?? null,
+    lastMessageAt: raw.lastMessageAt ?? null,
   };
 }
 
 export function normalizeChatMessage(raw) {
   if (!raw) return null;
+  // POST /api/chat/rooms/offer 응답 및 그 STOMP 브로드캐스트는 { room, message } 형태로 중첩되어 온다.
+  const source = raw.message ?? raw;
+  const sentAt = source.sentAt ?? source.sendAt ?? null;
   return {
-    messageId: raw.messageId ?? null,
-    roomId: raw.roomId ?? null,
-    senderId: raw.senderId ?? null,
-    senderNickname: raw.senderNickname ?? raw.senderNickName ?? "",
-    content: raw.content ?? "",
-    sentAt: raw.sentAt ?? null,
-    type: raw.type ?? "TEXT",
-    offeredPrice: raw.offeredPrice != null ? Number(raw.offeredPrice) : null,
-    offerStatus: raw.offerStatus ?? null,
-    orderId: raw.orderId ?? null,
+    messageId: source.messageId ?? `hist-${source.roomId}-${source.senderId}-${sentAt}`,
+    roomId: source.roomId ?? null,
+    senderId: source.senderId ?? null,
+    senderNickname: source.senderNickname ?? source.senderNickName ?? "",
+    content: source.content ?? "",
+    sentAt,
+    type: source.messageType ?? source.type ?? "TEXT",
+    offeredPrice: source.offeredPrice != null ? Number(source.offeredPrice) : null,
+    offerStatus: source.offerStatus ?? null,
+    orderId: source.orderId ?? null,
   };
 }
 

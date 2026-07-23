@@ -1,50 +1,69 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Tag } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { useChatSocket } from "../context/ChatSocketContext.jsx";
-import { getChatRoom, updateLastMessage } from "../lib/chatStorage.js";
-import { normalizeChatMessage, normalizeItem } from "../api/normalize.js";
+import { normalizeChatMessage, normalizeChatRoom } from "../api/normalize.js";
 import ChatBubble from "../components/ChatBubble.jsx";
 import { Button } from "../components/ui/button.jsx";
 import { Input } from "../components/ui/input.jsx";
 
 export default function ChatRoom() {
   const { roomId } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { api, member } = useSession();
-  const { connected, connectionError, subscribeRoom, sendMessage, sendOffer, acceptOffer, rejectOffer } = useChatSocket();
+  const { connected, connectionError, subscribeRoom, sendMessage, acceptOffer, rejectOffer } = useChatSocket();
   const [roomMeta, setRoomMeta] = useState(null);
   const [isSeller, setIsSeller] = useState(false);
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
   const [showOfferForm, setShowOfferForm] = useState(false);
   const [offerPrice, setOfferPrice] = useState("");
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const bottomRef = useRef(null);
+  const autoOfferSentRef = useRef(false);
 
-  useEffect(() => {
-    setRoomMeta(getChatRoom(member?.memberId, roomId));
-    setMessages([]);
-  }, [member?.memberId, roomId]);
-
-  // 로컬에 저장된 채팅방 요약(itemId)으로 상품을 조회해 내가 판매자인지 구매자인지 판별
-  // (백엔드에 채팅방 상세 조회 API가 아직 없어 roomMeta가 없는 경우 판매자 판별은 되지 않음 — docs/api/chat.md 참고)
   useEffect(() => {
     let cancelled = false;
-    if (!roomMeta?.itemId || !member?.memberId) {
-      setIsSeller(false);
-      return undefined;
-    }
+    setRoomMeta(null);
+    setIsSeller(false);
+    if (!member?.memberId) return undefined;
     (async () => {
       try {
-        const detail = await api.findItem(roomMeta.itemId);
-        const item = normalizeItem(detail, roomMeta.itemId);
-        if (!cancelled) setIsSeller(item.memberId === member.memberId);
+        const response = await api.listChatRooms();
+        const rooms = (response?.chatRooms ?? []).map(normalizeChatRoom);
+        const room = rooms.find((r) => String(r.roomId) === String(roomId)) ?? null;
+        if (cancelled) return;
+        setRoomMeta(room);
+        setIsSeller(room?.sellerId === member.memberId);
       } catch {
-        if (!cancelled) setIsSeller(false);
+        if (!cancelled) {
+          setRoomMeta(null);
+          setIsSeller(false);
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [api, roomMeta?.itemId, member?.memberId]);
+  }, [api, member?.memberId, roomId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMessages([]);
+    setHistoryLoaded(false);
+    (async () => {
+      try {
+        const response = await api.getChatMessages(roomId);
+        const history = (response?.list ?? []).map(normalizeChatMessage).reverse();
+        if (!cancelled) setMessages(history);
+      } catch {
+        if (!cancelled) setMessages([]);
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [api, roomId]);
 
   useEffect(() => {
     function handleIncoming(raw) {
@@ -62,9 +81,6 @@ export default function ChatRoom() {
         }
         return [...current, incoming];
       });
-      if (member?.memberId) {
-        updateLastMessage(member.memberId, roomId, { content: incoming.content, sentAt: incoming.sentAt });
-      }
     }
 
     const unsubscribe = subscribeRoom(roomId, handleIncoming);
@@ -104,11 +120,9 @@ export default function ChatRoom() {
     }
   }
 
-  async function handleSendOffer(event) {
-    event.preventDefault();
-    const price = Number(offerPrice);
-    if (!price || price <= 0) return;
-
+  async function submitOffer(price) {
+    if (!roomMeta?.itemId) return;
+    const content = `${price.toLocaleString()}원에 제안합니다`;
     const tempId = `pending-offer-${Date.now()}`;
     setMessages((current) => [
       ...current,
@@ -117,7 +131,7 @@ export default function ChatRoom() {
         roomId,
         senderId: member.memberId,
         senderNickname: member.nickName,
-        content: `${price.toLocaleString()}원에 제안합니다`,
+        content,
         sentAt: new Date().toISOString(),
         type: "OFFER",
         offeredPrice: price,
@@ -126,17 +140,36 @@ export default function ChatRoom() {
         pending: true,
       },
     ]);
-    setOfferPrice("");
-    setShowOfferForm(false);
 
     try {
-      await sendOffer(roomId, price);
+      // 서버가 메시지를 저장하고 /topic/chat/rooms/{roomId} 브로드캐스트로 최종 상태를 내려준다 —
+      // 위의 낙관적 항목은 handleIncoming의 pending 매칭 로직으로 교체된다.
+      await api.createOffer(roomMeta.itemId, content, price);
     } catch {
       setMessages((current) =>
         current.map((message) => (message.messageId === tempId ? { ...message, pending: false, failed: true } : message))
       );
     }
   }
+
+  async function handleSendOffer(event) {
+    event.preventDefault();
+    const price = Number(offerPrice);
+    if (!price || price <= 0) return;
+    setOfferPrice("");
+    setShowOfferForm(false);
+    await submitOffer(price);
+  }
+
+  // Detail.jsx의 "가격 제안하기" 다이얼로그에서 넘어온 경우: 채팅방 진입과 동시에 해당 가격으로 제안을 자동 전송한다.
+  useEffect(() => {
+    const pendingPrice = location.state?.pendingOfferPrice;
+    if (!pendingPrice || autoOfferSentRef.current || !connected || !member || !historyLoaded || !roomMeta?.itemId) return;
+    autoOfferSentRef.current = true;
+    navigate(location.pathname, { replace: true, state: {} });
+    submitOffer(pendingPrice);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, member, historyLoaded, location.state, roomId, roomMeta]);
 
   // 서버(백엔드 미구현)의 승인 응답을 아직 받을 수 없으므로 우선 낙관적으로 로컬 상태만 갱신한다.
   // 백엔드 구현 후에는 /topic/chat/rooms/{roomId} 브로드캐스트로 최종 상태가 다시 내려온다.
@@ -171,7 +204,6 @@ export default function ChatRoom() {
           <span>@{roomMeta?.counterpart?.nickName || "상대방"}</span>
         </div>
       </section>
-      <p className="chat-room-notice">이전 대화 내용은 새로고침하면 사라집니다.</p>
       {connectionError && <p className="chat-room-error">{connectionError}</p>}
       <section className="chat-message-list">
         {messages.map((message) => (
@@ -186,33 +218,35 @@ export default function ChatRoom() {
         ))}
         <div ref={bottomRef} />
       </section>
-      {showOfferForm && !isSeller && (
-        <form className="chat-offer-form" onSubmit={handleSendOffer}>
-          <Input
-            type="number"
-            min="0"
-            value={offerPrice}
-            onChange={(event) => setOfferPrice(event.target.value)}
-            placeholder="제안 가격을 입력하세요"
-          />
-          <Button type="submit" disabled={!connected || !offerPrice}>제안 전송</Button>
-          <Button type="button" variant="ghost" onClick={() => setShowOfferForm(false)}>취소</Button>
-        </form>
-      )}
-      <form className="chat-input-row" onSubmit={handleSend}>
-        {!isSeller && (
-          <Button type="button" variant="outline" size="icon" onClick={() => setShowOfferForm((current) => !current)} aria-label="가격 제안하기">
-            <Tag size={16} />
-          </Button>
+      <div className="chat-composer">
+        {showOfferForm && !isSeller && (
+          <form className="chat-offer-form" onSubmit={handleSendOffer}>
+            <Input
+              type="number"
+              min="0"
+              value={offerPrice}
+              onChange={(event) => setOfferPrice(event.target.value)}
+              placeholder="제안 가격을 입력하세요"
+            />
+            <Button type="submit" disabled={!connected || !offerPrice}>제안 전송</Button>
+            <Button type="button" variant="ghost" onClick={() => setShowOfferForm(false)}>취소</Button>
+          </form>
         )}
-        <Input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="메시지를 입력하세요"
-          maxLength={1000}
-        />
-        <Button type="submit" disabled={!connected || !draft.trim()}>전송</Button>
-      </form>
+        <form className="chat-input-row" onSubmit={handleSend}>
+          {!isSeller && (
+            <Button type="button" variant="outline" size="icon" onClick={() => setShowOfferForm((current) => !current)} aria-label="가격 제안하기">
+              <Tag size={16} />
+            </Button>
+          )}
+          <Input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="메시지를 입력하세요"
+            maxLength={1000}
+          />
+          <Button type="submit" disabled={!connected || !draft.trim()}>전송</Button>
+        </form>
+      </div>
     </main>
   );
 }

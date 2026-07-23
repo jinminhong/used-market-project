@@ -44,7 +44,7 @@ export function ChatSocketProvider({ children }) {
 
   const subscribeRoom = useCallback((roomId, onMessage) => {
     const client = clientRef.current;
-    if (!client) return () => {};
+    if (!client || !client.connected) return () => {};
     const subscription = client.subscribe(`/topic/chat/rooms/${roomId}`, (message) => {
       try {
         onMessage(JSON.parse(message.body));
@@ -78,12 +78,8 @@ export function ChatSocketProvider({ children }) {
     return Promise.resolve();
   }
 
-  // 백엔드 구현 가이드(docs/ORDER_LIFECYCLE_GUIDE.md 8절) 기준 destination — 서버 구현 시 이름을 반드시 맞출 것
-  const sendOffer = useCallback(
-    (roomId, price) => publish(`/app/chat/rooms/${roomId}/offers`, { price }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [connected]
-  );
+  // 백엔드 구현 가이드(docs/ORDER_LIFECYCLE_GUIDE.md 8절) 기준 destination — 서버 구현 시 이름을 반드시 맞출 것.
+  // 가격 제안 생성 자체는 STOMP가 아니라 REST(POST /api/chat/rooms/offer, api.createOffer)로 이루어진다.
   const acceptOffer = useCallback(
     (roomId, messageId) => publish(`/app/chat/rooms/${roomId}/offers/${messageId}/accept`, null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -95,7 +91,7 @@ export function ChatSocketProvider({ children }) {
     [connected]
   );
 
-  const value = { connected, connectionError, subscribeRoom, sendMessage, sendOffer, acceptOffer, rejectOffer };
+  const value = { connected, connectionError, subscribeRoom, sendMessage, acceptOffer, rejectOffer };
 
   return <ChatSocketContext.Provider value={value}>{children}</ChatSocketContext.Provider>;
 }

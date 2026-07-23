@@ -11,6 +11,7 @@ import com.side.project.web.exception.wishlist.WishListException;
 import com.side.project.web.exception.wishlist.WishListNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -54,7 +55,21 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ChatRoomException.class)
-    public ResponseEntity chatRoomException(HttpStatus httpStatus, ChatRoomException e) {
-        return ResponseEntity.status(httpStatus).body(e.getMessage());
+    public ResponseEntity chatRoomException(ChatRoomException e) {
+        return ResponseEntity.status(e.getHttpStatus()).body(e.getMessage());
+    }
+
+    @ExceptionHandler(ChatMessageException.class)
+    public ResponseEntity chatMessageException(ChatMessageException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity methodArgumentNotValidException(MethodArgumentNotValidException e) {
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .reduce((a, b) -> a + ", " + b)
+                .orElse(e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message);
     }
 }

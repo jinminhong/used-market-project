@@ -30,6 +30,8 @@ public class ChatRoomRepositoryImpl implements ChatRoomRepositoryCustom{
     @Override
     public Slice<ChatRoomDto> getChatRooms(Long memberId, Pageable pageable) {
         QChatMessage subMessage = new QChatMessage("subMessage");
+        QMember seller = new QMember("seller");
+        QMember buyer = new QMember("buyer");
 
         int pageSize = pageable.getPageSize();
 
@@ -39,8 +41,8 @@ public class ChatRoomRepositoryImpl implements ChatRoomRepositoryCustom{
                         chatRoom.lastMessageAt))
                 .from(chatRoom)
                 .join(chatRoom.item, item)
-                .join(chatRoom.item.seller, member)
-                .join(chatRoom.buyer, member)
+                .join(chatRoom.item.seller, seller)
+                .join(chatRoom.buyer, buyer)
                 .leftJoin(chatMessage)
                 .on(chatMessage.chatRoom.eq(chatRoom)
                         .and(

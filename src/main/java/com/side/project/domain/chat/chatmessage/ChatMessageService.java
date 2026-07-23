@@ -4,6 +4,7 @@ import com.side.project.domain.chat.chatmessage.dto.ChatMessageRequest;
 import com.side.project.domain.chat.chatmessage.dto.ChatMessageResponse;
 import com.side.project.domain.chat.chatmessage.repository.ChatMessageRepository;
 import com.side.project.domain.chat.chatroom.ChatRoom;
+import com.side.project.domain.chat.chatroom.dto.ChatRoomRequest;
 import com.side.project.domain.chat.chatroom.repository.ChatRoomRepository;
 import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
@@ -35,9 +36,27 @@ public class ChatMessageService {
             throw new ChatMessageException("메세지 내용을 입력해야 합니다.");
         }
         Member sender = memberRepository.findById(senderId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
-        ChatMessage chatMessage = new ChatMessage(chatRoom, sender, message);
+        ChatMessage chatMessage = new ChatMessage(chatRoom, sender, message , MessageType.TEXT);
         chatMessageRepository.save(chatMessage);
         chatRoom.updateLastMessageAt(chatMessage.getSentAt());
         return ChatMessageResponse.from(chatMessage);
+    }
+
+    @Transactional
+    public ChatMessage sendOffer(ChatRoom chatRoom, Member buyer , ChatRoomRequest request) {
+        if (!chatRoom.containsMember(buyer.getId())) {
+            throw new ChatRoomException(HttpStatus.FORBIDDEN,"해당 채팅방에 참여할 수 없습니다.");
+        }
+
+        String message = request.content().trim();
+        if (message.isBlank()) {
+            throw new ChatMessageException("메세지 내용을 입력해야 합니다.");
+        }
+
+        ChatMessage chatMessage = new ChatMessage();
+        chatMessage.offerChatMessage(chatRoom,buyer,message,MessageType.OFFER, request.offeredPrice());
+        chatMessageRepository.save(chatMessage);
+        chatRoom.updateLastMessageAt(chatMessage.getSentAt());
+        return chatMessage;
     }
 }

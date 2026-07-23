@@ -3,9 +3,9 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeItem, normalizeChatRoom, imageUrlFromUploadFile, defaultImage } from "../api/normalize.js";
-import { upsertChatRoom } from "../lib/chatStorage.js";
 import StatusPill from "../components/StatusPill.jsx";
 import { Button } from "../components/ui/button.jsx";
+import PriceOfferDialog from "../components/PriceOfferDialog.jsx";
 
 export default function Detail() {
   const { itemId } = useParams();
@@ -16,6 +16,7 @@ export default function Detail() {
   const [notFound, setNotFound] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [wished, setWished] = useState(false);
+  const [showOfferDialog, setShowOfferDialog] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,15 +102,23 @@ export default function Detail() {
     }
     await run(async () => {
       const room = normalizeChatRoom(await api.createChatRoom(item.itemId));
-      upsertChatRoom(member.memberId, {
-        roomId: room.roomId,
-        itemId: item.itemId,
-        itemName: item.name,
-        itemImageUrl: item.imageUrl,
-        counterpart: { memberId: item.memberId, nickName: item.nickName },
-        role: "buyer",
-      });
       navigate(`/chat/${room.roomId}`);
+    });
+  }
+
+  function handleProposePrice() {
+    if (!member) {
+      redirectToAuth();
+      return;
+    }
+    setShowOfferDialog(true);
+  }
+
+  async function handleSubmitOffer(price) {
+    await run(async () => {
+      const room = normalizeChatRoom(await api.createChatRoom(item.itemId));
+      setShowOfferDialog(false);
+      navigate(`/chat/${room.roomId}`, { state: { pendingOfferPrice: price } });
     });
   }
 
@@ -135,7 +144,7 @@ export default function Detail() {
       <section className="detail-layout">
         <div className="detail-gallery">
           <div className="detail-image">
-            <img src={slideImages[activeImageIndex]} alt="" />
+            <img src={slideImages[activeImageIndex]} alt={item.name} />
             {slideImages.length > 1 && (
               <>
                 <Button
@@ -195,7 +204,8 @@ export default function Detail() {
           ) : (
             <div className="buyer-actions">
               <Button size="lg" onClick={handleBuy}>{member ? "구매하기" : "로그인하고 구매하기"}</Button>
-              <Button size="lg" variant="outline" onClick={handleInquire}>{member ? "구매 문의 · 가격제안" : "로그인하고 문의하기"}</Button>
+              <Button size="lg" variant="outline" onClick={handleInquire}>{member ? "문의하기" : "로그인하고 문의하기"}</Button>
+              <Button size="lg" variant="outline" onClick={handleProposePrice}>{member ? "가격 제안하기" : "로그인하고 가격 제안하기"}</Button>
               <Button
                 size="lg"
                 variant={wished ? "secondary" : "ghost"}
@@ -212,6 +222,12 @@ export default function Detail() {
           )}
         </aside>
       </section>
+      <PriceOfferDialog
+        open={showOfferDialog}
+        currentPrice={item.price}
+        onCancel={() => setShowOfferDialog(false)}
+        onSubmit={handleSubmitOffer}
+      />
     </main>
   );
 }
