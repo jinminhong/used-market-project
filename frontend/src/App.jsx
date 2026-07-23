@@ -14,6 +14,8 @@ import ProfileEdit from "./pages/ProfileEdit.jsx";
 import Wishlist from "./pages/Wishlist.jsx";
 import PurchaseHistory from "./pages/PurchaseHistory.jsx";
 import SalesHistory from "./pages/SalesHistory.jsx";
+import ShippingManagement from "./pages/ShippingManagement.jsx";
+import ShippingForm from "./pages/ShippingForm.jsx";
 import ChatList from "./pages/ChatList.jsx";
 import ChatRoom from "./pages/ChatRoom.jsx";
 import { useSession } from "./context/SessionContext.jsx";
@@ -38,6 +40,8 @@ export default function App() {
           <Route path="/profile/wishlist" element={<RequireAuth><Wishlist /></RequireAuth>} />
           <Route path="/profile/purchases" element={<RequireAuth><PurchaseHistory /></RequireAuth>} />
           <Route path="/profile/sales" element={<RequireAuth><SalesHistory /></RequireAuth>} />
+          <Route path="/profile/sales/shipping" element={<RequireAuth><ShippingManagement /></RequireAuth>} />
+          <Route path="/profile/sales/:orderId/shipping" element={<RequireAuth><ShippingForm /></RequireAuth>} />
           <Route path="/chat" element={<RequireAuth><ChatList /></RequireAuth>} />
           <Route path="/chat/:roomId" element={<RequireAuth><ChatRoom /></RequireAuth>} />
           <Route path="/auth" element={<Auth />} />

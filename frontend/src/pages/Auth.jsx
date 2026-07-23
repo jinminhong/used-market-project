@@ -5,13 +5,24 @@ import { normalizeMember } from "../api/normalize.js";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
 import { Input } from "../components/ui/input.jsx";
 import { Button } from "../components/ui/button.jsx";
+import AddressSearchField from "../components/AddressSearchField.jsx";
 
 export default function Auth() {
   const { api, member, setMember, run, loading, setNotice } = useSession();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ loginId: "asd", name: "", password: "1234", passwordConfirm: "", nickname: "" });
+  const [form, setForm] = useState({
+    loginId: "asd",
+    name: "",
+    password: "1234",
+    passwordConfirm: "",
+    nickname: "",
+    zonecode: "",
+    roadAddress: "",
+    jibunAddress: "",
+    detailAddress: "",
+  });
   const [idCheck, setIdCheck] = useState(null);
   const [nicknameCheck, setNicknameCheck] = useState(null);
 
@@ -24,6 +35,10 @@ export default function Auth() {
     setForm((current) => ({ ...current, [name]: value }));
     if (name === "loginId") setIdCheck(null);
     if (name === "nickname") setNicknameCheck(null);
+  }
+
+  function handleAddressSearch(address) {
+    setForm((current) => ({ ...current, ...address }));
   }
 
   async function checkId() {
@@ -55,7 +70,15 @@ export default function Auth() {
         if (!nicknameCheck || nicknameCheck.value !== form.nickname.trim() || !nicknameCheck.available) {
           throw new Error("닉네임 중복확인을 해주세요.");
         }
-        await api.signup(form);
+        await api.signup({
+          ...form,
+          address: {
+            zonecode: form.zonecode,
+            roadAddress: form.roadAddress,
+            jibunAddress: form.jibunAddress,
+            detailAddress: form.detailAddress,
+          },
+        });
         const signedUpMember = await api.login({ loginId: form.loginId, password: form.password });
         setMember(normalizeMember(signedUpMember));
         navigate(searchParams.get("next") || "/");
@@ -106,6 +129,14 @@ export default function Auth() {
                   {nicknameCheck.available ? "사용 가능한 닉네임입니다." : "이미 사용 중인 닉네임입니다."}
                 </p>
               )}
+              <AddressSearchField
+                zonecode={form.zonecode}
+                roadAddress={form.roadAddress}
+                detailAddress={form.detailAddress}
+                onSearch={handleAddressSearch}
+                onDetailChange={change}
+                disabled={loading}
+              />
             </>
           )}
           <Button className="w-full" disabled={loading}>{mode === "login" ? "로그인" : "가입하기"}</Button>

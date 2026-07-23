@@ -50,9 +50,10 @@ export function normalizeMemberInfo(data) {
     nickName: data.nickName ?? data.nickname ?? "",
     name: data.name ?? "",
     address: {
-      city: data.address?.city ?? "",
-      street: data.address?.street ?? "",
-      zipcode: data.address?.zipcode ?? "",
+      zonecode: data.address?.zonecode ?? "",
+      roadAddress: data.address?.roadAddress ?? "",
+      jibunAddress: data.address?.jibunAddress ?? "",
+      detailAddress: data.address?.detailAddress ?? "",
     },
   };
 }
@@ -110,6 +111,8 @@ export function normalizePurchase(purchase) {
     agreedPrice: purchase.agreedPrice != null ? Number(purchase.agreedPrice) : null,
     purchaseDate: purchase.purchaseDate ?? null,
     sellerNickName: purchase.sellerNickName ?? "",
+    trackingCompany: purchase.trackingCompany ?? null,
+    trackingNumber: purchase.trackingNumber ?? null,
     item: {
       itemId: purchase.itemId ?? null,
       name: purchase.name ?? "이름 없는 상품",

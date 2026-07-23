@@ -69,29 +69,7 @@ export function ChatSocketProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected]);
 
-  function publish(destination, body) {
-    const client = clientRef.current;
-    if (!client || !client.connected) {
-      return Promise.reject(new Error("채팅 서버에 연결되어 있지 않습니다. 잠시 후 다시 시도해주세요."));
-    }
-    client.publish({ destination, body: body != null ? JSON.stringify(body) : "" });
-    return Promise.resolve();
-  }
-
-  // 백엔드 구현 가이드(docs/ORDER_LIFECYCLE_GUIDE.md 8절) 기준 destination — 서버 구현 시 이름을 반드시 맞출 것.
-  // 가격 제안 생성 자체는 STOMP가 아니라 REST(POST /api/chat/rooms/offer, api.createOffer)로 이루어진다.
-  const acceptOffer = useCallback(
-    (roomId, messageId) => publish(`/app/chat/rooms/${roomId}/offers/${messageId}/accept`, null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [connected]
-  );
-  const rejectOffer = useCallback(
-    (roomId, messageId) => publish(`/app/chat/rooms/${roomId}/offers/${messageId}/reject`, null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [connected]
-  );
-
-  const value = { connected, connectionError, subscribeRoom, sendMessage, acceptOffer, rejectOffer };
+  const value = { connected, connectionError, subscribeRoom, sendMessage };
 
   return <ChatSocketContext.Provider value={value}>{children}</ChatSocketContext.Provider>;
 }

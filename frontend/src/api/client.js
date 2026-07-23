@@ -151,8 +151,10 @@ export function createApi(useMock) {
       const params = new URLSearchParams(path.split("?")[1] ?? "");
       const page = Number(params.get("page") ?? 0);
       const size = Number(params.get("size") ?? 10);
+      const statusFilter = params.get("status") ?? "";
       const sales = mockOrders
         .filter((order) => order.sellerId === mockMember.memberId)
+        .filter((order) => !statusFilter || order.orderStatus === statusFilter)
         .map((order) => ({
           orderId: order.orderId,
           orderStatus: order.orderStatus,
@@ -165,11 +167,40 @@ export function createApi(useMock) {
           sellerNickName: order.sellerNickName,
           imageUrl: order.item.imageUrl,
           purchaseDate: order.createdDate,
+          trackingCompany: order.trackingCompany ?? null,
+          trackingNumber: order.trackingNumber ?? null,
         }));
       const start = page * size;
       const list = sales.slice(start, start + size);
       const hasNext = start + size < sales.length;
       return { list, hasNext };
+    }
+    const trackingOrderId = Number(path.match(/^\/orders\/(\d+)\/tracking$/)?.[1]);
+    if (path.startsWith("/orders/") && method === "PATCH" && trackingOrderId) {
+      if (!mockMember) throw new Error("로그인이 필요합니다.");
+      const order = mockOrders.find((o) => o.orderId === trackingOrderId);
+      if (!order) throw new Error("주문을 찾을 수 없습니다.");
+      if (order.sellerId !== mockMember.memberId) throw new Error("본인이 판매한 주문만 운송장을 등록할 수 있습니다.");
+      mockOrders = mockOrders.map((o) =>
+        o.orderId === trackingOrderId
+          ? { ...o, trackingCompany: body.trackingCompany, trackingNumber: body.trackingNumber }
+          : o
+      );
+      const updated = mockOrders.find((o) => o.orderId === trackingOrderId);
+      return {
+        orderId: updated.orderId,
+        orderStatus: updated.orderStatus,
+        itemId: updated.item.itemId,
+        name: updated.item.name,
+        description: updated.item.description,
+        price: updated.item.price,
+        status: updated.item.status,
+        sellerNickName: updated.sellerNickName,
+        imageUrl: updated.item.imageUrl,
+        purchaseDate: updated.createdDate,
+        trackingCompany: updated.trackingCompany,
+        trackingNumber: updated.trackingNumber,
+      };
     }
     const orderItemId = Number(path.match(/^\/orders\/(\d+)$/)?.[1]);
     if (path.startsWith("/orders/") && method === "POST" && orderItemId) {
@@ -288,6 +319,9 @@ export function createApi(useMock) {
     if (path === "/chat/rooms/offer" && method === "POST") {
       throw new Error("Mock 모드에서는 채팅 기능을 사용할 수 없습니다.");
     }
+    if (/^\/chat\/rooms\/\d+\/offer\/\d+\/(accept|reject)$/.test(path) && method === "POST") {
+      throw new Error("Mock 모드에서는 채팅 기능을 사용할 수 없습니다.");
+    }
     if (path === "/members/me" && method === "GET") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
       return {
@@ -295,7 +329,7 @@ export function createApi(useMock) {
         loginId: mockMember.loginId,
         nickName: mockMember.nickName,
         name: mockMember.name ?? mockMember.nickName,
-        address: mockMember.address ?? { city: "", street: "", zipcode: "" },
+        address: mockMember.address ?? { zonecode: "", roadAddress: "", jibunAddress: "", detailAddress: "" },
       };
     }
     if (path === "/members/me" && method === "PATCH") {
@@ -350,8 +384,13 @@ export function createApi(useMock) {
     deleteItem: (id) => request(`/items/${id}`, { method: "DELETE" }),
     buyItem: (itemId) => request(`/orders/${itemId}`, { method: "POST" }),
     listPurchases: (page = 0, size = 10) => request(`/orders/purchases?page=${page}&size=${size}`),
-    listSales: (page = 0, size = 10) => request(`/orders/sales?page=${page}&size=${size}`),
+    listSales: (page = 0, size = 10, { status } = {}) => {
+      const params = new URLSearchParams({ page, size });
+      if (status) params.set("status", status);
+      return request(`/orders/sales?${params.toString()}`);
+    },
     changeOrderStatus: (orderId, action) => request(`/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ action }) }),
+    saveTracking: (orderId, payload) => request(`/orders/${orderId}/tracking`, { method: "PATCH", body: JSON.stringify(payload) }),
     listWishlist: (page = 0, size = 10) => request(`/wishlist?page=${page}&size=${size}`),
     addWishlist: (itemId) => request(`/wishlist/${itemId}`, { method: "POST" }),
     removeWishlist: (itemId) => request(`/wishlist/${itemId}`, { method: "DELETE" }),
@@ -361,5 +400,7 @@ export function createApi(useMock) {
     getChatMessages: (roomId, page = 0, size = 30) => request(`/chat/rooms/${roomId}?page=${page}&size=${size}`),
     createOffer: (itemId, content, offeredPrice) =>
       request("/chat/rooms/offer", { method: "POST", body: JSON.stringify({ itemId, content, offeredPrice }) }),
+    acceptOffer: (roomId, messageId) => request(`/chat/rooms/${roomId}/offer/${messageId}/accept`, { method: "POST" }),
+    rejectOffer: (roomId, messageId) => request(`/chat/rooms/${roomId}/offer/${messageId}/reject`, { method: "POST" }),
   };
 }

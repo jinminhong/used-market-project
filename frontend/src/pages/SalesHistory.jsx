@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Package } from "lucide-react";
+import { ChevronLeft, Package, Truck } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizePurchase } from "../api/normalize.js";
 import StatusPill from "../components/StatusPill.jsx";
@@ -98,6 +98,10 @@ export default function SalesHistory() {
         <p>My sales</p>
         <h1>판매내역</h1>
       </section>
+      <Link to="/profile/sales/shipping" className="shop-cta">
+        <Truck size={20} />
+        <span>발송 관리 (결제완료 상품 운송장 등록)</span>
+      </Link>
       {orders && orders.length === 0 && <p className="quiet-message">아직 판매한 상품이 없습니다.</p>}
       {orders && orders.length > 0 && (
         <ul className="order-list">
