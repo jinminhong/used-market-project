@@ -21,7 +21,7 @@ public record ChatMessageResponse(
     public static ChatMessageResponse from(
             ChatMessage message
     ) {
-        return from(message, null);
+        return from(message, message.getOrderId());
     }
 
     public static ChatMessageResponse from(

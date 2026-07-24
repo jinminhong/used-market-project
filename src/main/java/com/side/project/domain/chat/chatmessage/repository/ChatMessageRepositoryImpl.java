@@ -32,7 +32,7 @@ public class ChatMessageRepositoryImpl implements ChatMessageRepositoryCustom{
 
         List<ChatMessageDto> chatMessages = queryFactory.select(new QChatMessageDto(chatMessage.id,
                         chatRoom.item.id, member.id, chatMessage.sentAt, member.nickName, chatMessage.content,
-                        chatMessage.messageType, chatMessage.offeredPrice, chatMessage.offerStatus))
+                        chatMessage.messageType, chatMessage.offeredPrice, chatMessage.offerStatus, chatMessage.orderId))
                 .from(chatMessage)
                 .join(chatMessage.sender, member)
                 .join(chatMessage.chatRoom, chatRoom)

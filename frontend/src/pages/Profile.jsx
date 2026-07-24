@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronLeft, Store, Package, ShoppingBag, Heart, MessageCircle } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
-import { normalizeMemberInfo } from "../api/normalize.js";
+import { normalizeMemberInfo, formatAddress } from "../api/normalize.js";
 
 export default function Profile() {
   const { api, setNotice } = useSession();
@@ -39,9 +39,7 @@ export default function Profile() {
 
   if (!info) return null;
 
-  const addressText = info.address.roadAddress
-    ? `[${info.address.zonecode}] ${info.address.roadAddress} ${info.address.detailAddress}`.trim()
-    : "";
+  const addressText = formatAddress(info.address);
 
   return (
     <main className="page-shell narrow-page profile-page">

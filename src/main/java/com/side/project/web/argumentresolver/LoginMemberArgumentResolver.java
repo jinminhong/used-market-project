@@ -29,9 +29,6 @@ public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolve
 
     @Override
     public Object resolveArgument(MethodParameter methodParameter, ModelAndViewContainer modelAndViewContainer, NativeWebRequest nativeWebRequest, WebDataBinderFactory webDataBinderFactory) throws Exception {
-
-        log.info("resolverArgument 실행");
-
         HttpServletRequest request = (HttpServletRequest) nativeWebRequest.getNativeRequest();
         HttpSession session = request.getSession(false);
 

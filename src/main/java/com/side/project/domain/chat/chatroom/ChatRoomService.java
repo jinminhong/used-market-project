@@ -10,7 +10,6 @@ import com.side.project.domain.chat.chatmessage.repository.ChatMessageRepository
 import com.side.project.domain.chat.chatroom.dto.*;
 import com.side.project.domain.chat.chatroom.repository.ChatRoomRepository;
 import com.side.project.domain.item.Item;
-import com.side.project.domain.item.ItemService;
 import com.side.project.domain.item.ItemStatus;
 import com.side.project.domain.item.repository.ItemRepository;
 import com.side.project.domain.member.Member;
@@ -44,7 +43,6 @@ public class ChatRoomService {
     private final ChatMessageRepository chatMessageRepository;
     private final ChatMessageService chatMessageService;
     private final OrdersService ordersService;
-    private final ItemService itemService;
 
     @Transactional
     public ChatRoomResponse createChatRoom(Long itemId , Long buyerId) {
@@ -90,7 +88,9 @@ public class ChatRoomService {
     @Transactional
     public ChatRoomAndMessageDto createOffer(Long itemId, Long buyerId, ChatRoomRequest request) {
         Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
-
+        if (item.getStatus() != ItemStatus.SELLING) {
+            throw new ItemException("이미 거래 중이거나 완료된 상품입니다.");
+        }
         Long sellerId = item.getSeller().getId();
         if (sellerId.equals(buyerId)) {
             throw new ChatRoomException(HttpStatus.CONFLICT,"본인이 등록한 상품에는 문의할 수 없습니다.");
@@ -151,11 +151,12 @@ public class ChatRoomService {
         }
 
         Integer offeredPrice = offeredMessage.getOfferedPrice();
-        itemService.reserveForOffer(item);
 
-        Long orderId = ordersService.createOrders(offeredMessage.getSender(), item, OrderStatus.ACCEPTED, offeredPrice);
+        Orders orders = ordersService.save(item.getId(), offeredMessage.getSender().getId(), OrderStatus.ACCEPTED);
+        Long orderId = orders.getId();
+        orders.updateAgreedPrice(offeredPrice);
 
-        ChatMessage chatMessage = chatMessageService.acceptOffer(chatRoom, findSeller, offeredMessage);
+        ChatMessage chatMessage = chatMessageService.acceptOffer(chatRoom, findSeller, offeredMessage, orderId);
         return ChatRoomAndMessageDto.fromAccepted(chatRoom, chatMessage, orderId);
     }
 

@@ -23,7 +23,7 @@ public class OrdersRepositoryImpl implements OrdersRepositoryCustom {
     private final JPAQueryFactory queryFactory;
 
     @Override
-    public Slice<OrdersResponseDto> findAllPurchases(Long memberId, Pageable pageable) {
+    public Slice<OrdersResponseDto> findAllPurchases(Long memberId, List<OrderStatus> statuses, Pageable pageable) {
         int pageSize = pageable.getPageSize();
 
         List<OrdersResponseDto> purchasesList = queryFactory.select(new QOrdersResponseDto(orders.id, orders.item.id, orders.item.name, orders.item.description, orders.item.price, orders.item.status, orders.orderStatus, orders.item.seller.nickName, orders.item.thumbnailImage.storedFilename, orders.trackingCompany, orders.trackingNumber, orders.lastModifiedDate, orders.agreedPrice))
@@ -31,7 +31,7 @@ public class OrdersRepositoryImpl implements OrdersRepositoryCustom {
                 .join(orders.item, item)
                 .join(orders.item.thumbnailImage, itemImage)
                 .join(orders.item.seller, member)
-                .where(orders.buyer.id.eq(memberId), orders.orderStatus.in(OrderStatus.COMPLETED, OrderStatus.PAY_COMPLETED))
+                .where(orders.buyer.id.eq(memberId), orderStatusIn(statuses))
                 .orderBy(orders.lastModifiedDate.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize() + 1)
@@ -46,7 +46,7 @@ public class OrdersRepositoryImpl implements OrdersRepositoryCustom {
     }
 
     @Override
-    public Slice<OrdersResponseDto> findAllSales(Long memberId, OrderStatus status, Pageable pageable) {
+    public Slice<OrdersResponseDto> findItemsWithOrderStatus(Long memberId, List<OrderStatus> statuses, Pageable pageable) {
         int pageSize = pageable.getPageSize();
 
         List<OrdersResponseDto> salesList = queryFactory.select(new QOrdersResponseDto(orders.id, orders.item.id, orders.item.name, orders.item.description, orders.item.price, orders.item.status, orders.orderStatus, orders.item.seller.nickName, orders.item.thumbnailImage.storedFilename, orders.trackingCompany, orders.trackingNumber, orders.lastModifiedDate, orders.agreedPrice))
@@ -54,7 +54,7 @@ public class OrdersRepositoryImpl implements OrdersRepositoryCustom {
                 .join(orders.item, item)
                 .join(orders.item.thumbnailImage, itemImage)
                 .join(orders.item.seller, member)
-                .where(item.seller.id.eq(memberId), orderStatusEq(status))
+                .where(item.seller.id.eq(memberId), orderStatusIn(statuses))
                 .orderBy(orders.lastModifiedDate.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize() + 1)
@@ -68,7 +68,9 @@ public class OrdersRepositoryImpl implements OrdersRepositoryCustom {
         return new SliceImpl<>(salesList , pageable , hasNext);
     }
 
-    private BooleanExpression orderStatusEq(OrderStatus status) {
-        return status != null ? orders.orderStatus.eq(status) : orders.orderStatus.in(OrderStatus.COMPLETED, OrderStatus.PAY_COMPLETED);
+    private BooleanExpression orderStatusIn(List<OrderStatus> statuses) {
+        return (statuses == null || statuses.isEmpty())
+                ? null
+                : orders.orderStatus.in(statuses);
     }
 }

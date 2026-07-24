@@ -208,6 +208,22 @@ export default function ChatRoom() {
     }
   }
 
+  function handleGoToOrderCheckout(message) {
+    if (!message.orderId) return;
+    navigate(`/orders/${message.orderId}/checkout`, {
+      state: {
+        orderId: message.orderId,
+        agreedPrice: message.offeredPrice,
+        item: {
+          itemId: roomMeta?.itemId,
+          name: roomMeta?.itemName,
+          imageUrl: roomMeta?.itemImageUrl,
+          nickName: roomMeta?.counterpart?.nickName,
+        },
+      },
+    });
+  }
+
   return (
     <main className="chat-room-page">
       <section className="chat-room-header">
@@ -225,8 +241,10 @@ export default function ChatRoom() {
             message={message}
             isMine={message.senderId === member?.memberId}
             isSeller={isSeller}
+            sellerId={roomMeta?.sellerId}
             onAcceptOffer={handleAcceptOffer}
             onRejectOffer={handleRejectOffer}
+            onGoToOrderCheckout={handleGoToOrderCheckout}
           />
         ))}
         <div ref={bottomRef} />

@@ -1,6 +1,12 @@
 import { sampleItems } from "./constants.js";
 import { defaultImage } from "./normalize.js";
 
+function appendStatusParams(params, status) {
+  if (!status) return;
+  const values = Array.isArray(status) ? status : [status];
+  values.filter(Boolean).forEach((value) => params.append("status", value));
+}
+
 export function buildItemFormData(data, dtoPartName, includeEmptyFilePart = false) {
   const itemDto = {
     name: data.name,
@@ -126,8 +132,12 @@ export function createApi(useMock) {
       const params = new URLSearchParams(path.split("?")[1] ?? "");
       const page = Number(params.get("page") ?? 0);
       const size = Number(params.get("size") ?? 10);
+      const statusFilter = params.getAll("status");
       const purchases = mockOrders
         .filter((order) => order.buyerId === mockMember.memberId)
+        .filter((order) => statusFilter.length === 0
+          ? ["COMPLETED", "PAY_COMPLETED"].includes(order.orderStatus)
+          : statusFilter.includes(order.orderStatus))
         .map((order) => ({
           orderId: order.orderId,
           orderStatus: order.orderStatus,
@@ -151,10 +161,12 @@ export function createApi(useMock) {
       const params = new URLSearchParams(path.split("?")[1] ?? "");
       const page = Number(params.get("page") ?? 0);
       const size = Number(params.get("size") ?? 10);
-      const statusFilter = params.get("status") ?? "";
+      const statusFilter = params.getAll("status");
       const sales = mockOrders
         .filter((order) => order.sellerId === mockMember.memberId)
-        .filter((order) => !statusFilter || order.orderStatus === statusFilter)
+        .filter((order) => statusFilter.length === 0
+          ? ["COMPLETED", "PAY_COMPLETED"].includes(order.orderStatus)
+          : statusFilter.includes(order.orderStatus))
         .map((order) => ({
           orderId: order.orderId,
           orderStatus: order.orderStatus,
@@ -322,6 +334,9 @@ export function createApi(useMock) {
     if (/^\/chat\/rooms\/\d+\/offer\/\d+\/(accept|reject)$/.test(path) && method === "POST") {
       throw new Error("Mock 모드에서는 채팅 기능을 사용할 수 없습니다.");
     }
+    if (path.startsWith("/chat/rooms/offers/received") && method === "GET") {
+      throw new Error("Mock 모드에서는 채팅 기능을 사용할 수 없습니다.");
+    }
     if (path === "/members/me" && method === "GET") {
       if (!mockMember) throw new Error("로그인이 필요합니다.");
       return {
@@ -383,10 +398,14 @@ export function createApi(useMock) {
       : request(`/items/${id}`, { method: "PATCH", body: buildItemFormData(data, "itemUpdateDto", true) }),
     deleteItem: (id) => request(`/items/${id}`, { method: "DELETE" }),
     buyItem: (itemId) => request(`/orders/${itemId}`, { method: "POST" }),
-    listPurchases: (page = 0, size = 10) => request(`/orders/purchases?page=${page}&size=${size}`),
+    listPurchases: (page = 0, size = 10, { status } = {}) => {
+      const params = new URLSearchParams({ page, size });
+      appendStatusParams(params, status);
+      return request(`/orders/purchases?${params.toString()}`);
+    },
     listSales: (page = 0, size = 10, { status } = {}) => {
       const params = new URLSearchParams({ page, size });
-      if (status) params.set("status", status);
+      appendStatusParams(params, status);
       return request(`/orders/sales?${params.toString()}`);
     },
     changeOrderStatus: (orderId, action) => request(`/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ action }) }),
@@ -402,5 +421,6 @@ export function createApi(useMock) {
       request("/chat/rooms/offer", { method: "POST", body: JSON.stringify({ itemId, content, offeredPrice }) }),
     acceptOffer: (roomId, messageId) => request(`/chat/rooms/${roomId}/offer/${messageId}/accept`, { method: "POST" }),
     rejectOffer: (roomId, messageId) => request(`/chat/rooms/${roomId}/offer/${messageId}/reject`, { method: "POST" }),
+    listReceivedOffers: (page = 0, size = 10) => request(`/chat/rooms/offers/received?page=${page}&size=${size}`),
   };
 }

@@ -107,6 +107,9 @@
 .chat-bubble p { margin: 0; white-space: pre-wrap; word-break: break-word; }
 .chat-bubble.pending { opacity: 0.6; }
 .chat-bubble.failed { background: var(--color-danger); color: #fff; }
+.chat-bubble.chat-bubble-system { background: transparent; box-shadow: none; border: 1px dashed var(--color-border); display: flex; flex-direction: column; gap: var(--space-2); align-items: flex-start; }
+.mine .chat-bubble.chat-bubble-system { color: inherit; align-items: flex-end; }
+.chat-bubble-system p { font-style: italic; color: var(--color-text-subtle); }
 
 .chat-bubble-meta { font-size: 11px; color: var(--color-text-subtle); margin-top: 2px; }
 

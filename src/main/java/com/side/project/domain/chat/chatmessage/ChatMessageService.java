@@ -70,12 +70,12 @@ public class ChatMessageService {
     }
 
     @Transactional
-    public ChatMessage acceptOffer(ChatRoom chatRoom, Member seller, ChatMessage offerChatMessage) {
+    public ChatMessage acceptOffer(ChatRoom chatRoom, Member seller, ChatMessage offerChatMessage, Long orderId) {
         offerChatMessage.changeStatusToAccept();
 
         String message = "제안을 수락합니다.";
         ChatMessage chatMessage = new ChatMessage();
-        chatMessage.acceptOfferMessage(chatRoom,seller,message,MessageType.OFFER , offerChatMessage.getOfferedPrice());
+        chatMessage.acceptOfferMessage(chatRoom,seller,message,MessageType.OFFER , offerChatMessage.getOfferedPrice(), orderId);
         chatMessageRepository.save(chatMessage);
         chatRoom.updateLastMessageAt(chatMessage.getSentAt());
 

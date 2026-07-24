@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
-import { normalizeItem, normalizeMemberInfo } from "../api/normalize.js";
+import { normalizeItem, normalizeMemberInfo, formatAddress } from "../api/normalize.js";
 import StatusPill from "../components/StatusPill.jsx";
 
 export default function Checkout() {
@@ -52,7 +52,7 @@ export default function Checkout() {
 
   if (!item || !buyerInfo) return null;
 
-  const addressText = [buyerInfo.address.city, buyerInfo.address.street, buyerInfo.address.zipcode].filter(Boolean).join(" ");
+  const addressText = formatAddress(buyerInfo.address);
   const hasAddress = Boolean(addressText);
   const alreadyTaken = item.status !== "SELLING";
   const canConfirm = hasAddress && !alreadyTaken;

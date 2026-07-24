@@ -1,22 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ChevronLeft, Package, Truck } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
-import { normalizePurchase } from "../api/normalize.js";
+import { normalizePurchase, normalizeReceivedOffer } from "../api/normalize.js";
 import StatusPill from "../components/StatusPill.jsx";
 import OrderStatusPill from "../components/OrderStatusPill.jsx";
 import { Button } from "../components/ui/button.jsx";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
 
 const PAGE_SIZE = 10;
 
 export default function SalesHistory() {
   const { api, run, setNotice, loading, setLoading } = useSession();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get("tab") === "received" ? "received" : "sales";
+
+  // "판매내역" 탭
   const [orders, setOrders] = useState(null);
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-
-  const apiRef = useRef(null);
+  const requestKeyRef = useRef("");
   const inFlightRequestRef = useRef("");
   const loadedPagesRef = useRef(new Set());
 
@@ -51,18 +55,21 @@ export default function SalesHistory() {
   }
 
   useEffect(() => {
-    if (apiRef.current === api) return;
-    apiRef.current = api;
+    if (tab !== "sales") return;
+    const key = api ? "api" : "no-api";
+    if (requestKeyRef.current === key) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    requestKeyRef.current = key;
     inFlightRequestRef.current = "";
     loadedPagesRef.current = new Set();
     setPage(0);
     setHasNext(true);
     loadSales(0, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api]);
+  }, [api, tab]);
 
   useEffect(() => {
     function handleScroll() {
+      if (tab !== "sales") return;
       const scrollBottom = window.innerHeight + window.scrollY;
       const documentHeight = document.documentElement.scrollHeight;
       const shouldLoadMore = documentHeight - scrollBottom < 500;
@@ -75,7 +82,65 @@ export default function SalesHistory() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasNext, loadingMore, loading, page, api]);
+  }, [hasNext, loadingMore, loading, page, api, tab]);
+
+  // "받은 제안" 탭: 응답 대기중인 제안(채팅 기준) + 이미 수락되어 구매자 결제를 기다리는 주문
+  const [pendingOffers, setPendingOffers] = useState(null);
+  const [pendingHasNext, setPendingHasNext] = useState(false);
+  const [pendingPage, setPendingPage] = useState(0);
+  const [pendingLoadingMore, setPendingLoadingMore] = useState(false);
+  const [acceptedOrders, setAcceptedOrders] = useState(null);
+  const [acceptedHasNext, setAcceptedHasNext] = useState(false);
+  const [acceptedPage, setAcceptedPage] = useState(0);
+  const [acceptedLoadingMore, setAcceptedLoadingMore] = useState(false);
+  const receivedLoadedRef = useRef(false);
+
+  async function loadPendingOffers(targetPage, append) {
+    setPendingLoadingMore(append);
+    try {
+      const data = await api.listReceivedOffers(targetPage, PAGE_SIZE);
+      const list = (data?.list ?? []).map(normalizeReceivedOffer);
+      setPendingOffers((current) => (append ? [...(current ?? []), ...list] : list));
+      setPendingHasNext(Boolean(data?.hasNext));
+      setPendingPage(targetPage + 1);
+    } catch (error) {
+      if (!append) setPendingOffers([]);
+      setNotice(error.message || "받은 제안을 불러오지 못했습니다.");
+    } finally {
+      setPendingLoadingMore(false);
+    }
+  }
+
+  async function loadAcceptedOrders(targetPage, append) {
+    setAcceptedLoadingMore(append);
+    try {
+      const data = await api.listSales(targetPage, PAGE_SIZE, { status: "ACCEPTED" });
+      const list = (data?.list ?? []).map(normalizePurchase);
+      setAcceptedOrders((current) => (append ? [...(current ?? []), ...list] : list));
+      setAcceptedHasNext(Boolean(data?.hasNext));
+      setAcceptedPage(targetPage + 1);
+    } catch (error) {
+      if (!append) setAcceptedOrders([]);
+      setNotice(error.message || "수락된 제안을 불러오지 못했습니다.");
+    } finally {
+      setAcceptedLoadingMore(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab !== "received" || receivedLoadedRef.current) return;
+    receivedLoadedRef.current = true;
+    loadPendingOffers(0, false);
+    loadAcceptedOrders(0, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  function changeTab(nextTab) {
+    const next = new URLSearchParams(searchParams);
+    if (nextTab === "sales") next.delete("tab");
+    else next.set("tab", nextTab);
+    setSearchParams(next);
+  }
 
   async function handleAction(orderId, action, message) {
     await run(async () => {
@@ -90,6 +155,21 @@ export default function SalesHistory() {
     }, message);
   }
 
+  async function handleAcceptOffer(offer) {
+    await run(async () => {
+      await api.acceptOffer(offer.roomId, offer.messageId);
+      setPendingOffers((current) => (current ?? []).filter((item) => item.messageId !== offer.messageId));
+      loadAcceptedOrders(0, false);
+    }, "제안을 수락했습니다.");
+  }
+
+  async function handleRejectOffer(offer) {
+    await run(async () => {
+      await api.rejectOffer(offer.roomId, offer.messageId);
+      setPendingOffers((current) => (current ?? []).filter((item) => item.messageId !== offer.messageId));
+    }, "제안을 거절했습니다.");
+  }
+
   return (
     <main className="page-shell narrow-page">
       <Link className="text-button" to="/profile"><ChevronLeft size={16} /> Back to profile</Link>
@@ -102,47 +182,117 @@ export default function SalesHistory() {
         <Truck size={20} />
         <span>발송 관리 (결제완료 상품 운송장 등록)</span>
       </Link>
-      {orders && orders.length === 0 && <p className="quiet-message">아직 판매한 상품이 없습니다.</p>}
-      {orders && orders.length > 0 && (
-        <ul className="order-list">
-          {orders.map((order) => (
-            <li key={order.orderId} className="order-row">
-              <Link to={`/items/${order.item.itemId}`} className="order-row-thumb">
-                <img src={order.item.imageUrl} alt={order.item.name} />
-              </Link>
-              <div className="order-row-body">
-                <strong>{order.item.name}</strong>
-                <span>{(order.agreedPrice ?? order.item.price).toLocaleString()}원</span>
-                <em>{order.purchaseDate ? new Date(order.purchaseDate).toLocaleDateString() : ""}</em>
-              </div>
-              <div className="order-row-status">
-                <StatusPill status={order.item.status} />
-                <OrderStatusPill status={order.orderStatus} />
-              </div>
-              <div className="order-row-actions">
-                {order.orderStatus === "REQUESTED" && (
-                  <>
-                    <Button size="sm" disabled={loading} onClick={() => handleAction(order.orderId, "ACCEPT", "주문을 승인했습니다.")}>승인</Button>
-                    <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 거절했습니다.")}>거절</Button>
-                  </>
-                )}
-                {order.orderStatus === "ACCEPTED" && <span className="quiet-message">구매자 결제 대기 중</span>}
-                {order.orderStatus === "PAY_COMPLETED" && (
-                  <>
-                    <Button size="sm" disabled={loading} onClick={() => handleAction(order.orderId, "SHIP", "발송 처리했습니다.")}>발송 처리</Button>
-                    <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 취소했습니다.")}>취소</Button>
-                  </>
-                )}
-                {order.orderStatus === "SHIPPING" && (
-                  <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 취소했습니다.")}>취소(귀책사유)</Button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
+      <Tabs value={tab} onValueChange={changeTab}>
+        <TabsList className="w-full">
+          <TabsTrigger value="sales" className="flex-1">판매내역</TabsTrigger>
+          <TabsTrigger value="received" className="flex-1">받은 제안</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {tab === "sales" && (
+        <>
+          {orders && orders.length === 0 && <p className="quiet-message">아직 판매한 상품이 없습니다.</p>}
+          {orders && orders.length > 0 && (
+            <ul className="order-list">
+              {orders.map((order) => (
+                <li key={order.orderId} className="order-row">
+                  <Link to={`/items/${order.item.itemId}`} className="order-row-thumb">
+                    <img src={order.item.imageUrl} alt={order.item.name} />
+                  </Link>
+                  <div className="order-row-body">
+                    <strong>{order.item.name}</strong>
+                    <span>{(order.agreedPrice ?? order.item.price).toLocaleString()}원</span>
+                    <em>{order.purchaseDate ? new Date(order.purchaseDate).toLocaleDateString() : ""}</em>
+                  </div>
+                  <div className="order-row-status">
+                    <StatusPill status={order.item.status} />
+                    <OrderStatusPill status={order.orderStatus} />
+                  </div>
+                  <div className="order-row-actions">
+                    {order.orderStatus === "REQUESTED" && (
+                      <>
+                        <Button size="sm" disabled={loading} onClick={() => handleAction(order.orderId, "ACCEPT", "주문을 승인했습니다.")}>승인</Button>
+                        <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 거절했습니다.")}>거절</Button>
+                      </>
+                    )}
+                    {order.orderStatus === "ACCEPTED" && <span className="quiet-message">구매자 결제 대기 중</span>}
+                    {order.orderStatus === "PAY_COMPLETED" && (
+                      <>
+                        <Button size="sm" disabled={loading} onClick={() => handleAction(order.orderId, "SHIP", "발송 처리했습니다.")}>발송 처리</Button>
+                        <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 취소했습니다.")}>취소</Button>
+                      </>
+                    )}
+                    {order.orderStatus === "SHIPPING" && (
+                      <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 취소했습니다.")}>취소(귀책사유)</Button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {loadingMore && <p className="quiet-message">판매내역을 더 불러오는 중입니다.</p>}
+          {orders && orders.length > 0 && !hasNext && <p className="quiet-message">마지막 판매내역까지 모두 봤습니다.</p>}
+        </>
       )}
-      {loadingMore && <p className="quiet-message">판매내역을 더 불러오는 중입니다.</p>}
-      {orders && orders.length > 0 && !hasNext && <p className="quiet-message">마지막 판매내역까지 모두 봤습니다.</p>}
+
+      {tab === "received" && (
+        <>
+          <section className="order-section">
+            <h2>응답 대기중인 제안</h2>
+            {pendingOffers && pendingOffers.length === 0 && <p className="quiet-message">받은 제안이 없습니다.</p>}
+            {pendingOffers && pendingOffers.length > 0 && (
+              <ul className="order-list">
+                {pendingOffers.map((offer) => (
+                  <li key={offer.messageId} className="order-row">
+                    <Link to={`/items/${offer.itemId}`} className="order-row-thumb">
+                      <img src={offer.imageUrl} alt={offer.itemName} />
+                    </Link>
+                    <div className="order-row-body">
+                      <strong>{offer.itemName}</strong>
+                      <span>{(offer.offeredPrice ?? 0).toLocaleString()}원</span>
+                      <em>@{offer.buyerNickname}</em>
+                    </div>
+                    <div className="order-row-actions">
+                      <Button size="sm" disabled={loading} onClick={() => handleAcceptOffer(offer)}>수락</Button>
+                      <Button size="sm" variant="outline" disabled={loading} onClick={() => handleRejectOffer(offer)}>거절</Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {pendingHasNext && (
+              <Button size="sm" variant="outline" disabled={pendingLoadingMore} onClick={() => loadPendingOffers(pendingPage, true)}>더 보기</Button>
+            )}
+          </section>
+
+          <section className="order-section">
+            <h2>수락됨 · 구매자 결제 대기</h2>
+            {acceptedOrders && acceptedOrders.length === 0 && <p className="quiet-message">구매자 결제를 기다리는 주문이 없습니다.</p>}
+            {acceptedOrders && acceptedOrders.length > 0 && (
+              <ul className="order-list">
+                {acceptedOrders.map((order) => (
+                  <li key={order.orderId} className="order-row">
+                    <Link to={`/items/${order.item.itemId}`} className="order-row-thumb">
+                      <img src={order.item.imageUrl} alt={order.item.name} />
+                    </Link>
+                    <div className="order-row-body">
+                      <strong>{order.item.name}</strong>
+                      <span>{(order.agreedPrice ?? order.item.price).toLocaleString()}원</span>
+                    </div>
+                    <div className="order-row-status">
+                      <OrderStatusPill status={order.orderStatus} />
+                    </div>
+                    <span className="quiet-message">구매자 결제 대기 중</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {acceptedHasNext && (
+              <Button size="sm" variant="outline" disabled={acceptedLoadingMore} onClick={() => loadAcceptedOrders(acceptedPage, true)}>더 보기</Button>
+            )}
+          </section>
+        </>
+      )}
     </main>
   );
 }

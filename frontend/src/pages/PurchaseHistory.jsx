@@ -1,27 +1,36 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ShoppingBag } from "lucide-react";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizePurchase } from "../api/normalize.js";
 import StatusPill from "../components/StatusPill.jsx";
 import OrderStatusPill from "../components/OrderStatusPill.jsx";
 import { Button } from "../components/ui/button.jsx";
+import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
 
 const PAGE_SIZE = 10;
+const TAB_STATUSES = {
+  pending: ["REQUESTED"],
+  agreed: ["ACCEPTED"],
+};
 
 export default function PurchaseHistory() {
   const { api, run, setNotice, loading, setLoading } = useSession();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab = tabParam === "pending" || tabParam === "agreed" ? tabParam : "completed";
   const [orders, setOrders] = useState(null);
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const apiRef = useRef(null);
+  const requestKeyRef = useRef("");
   const inFlightRequestRef = useRef("");
   const loadedPagesRef = useRef(new Set());
 
   async function loadPurchases(targetPage = 0, append = false) {
-    const requestKey = `${append ? "append" : "replace"}:${targetPage}`;
+    const requestKey = `${append ? "append" : "replace"}:${tab}:${targetPage}`;
 
     if (append && !hasNext) return;
     if (loadedPagesRef.current.has(targetPage)) return;
@@ -32,7 +41,8 @@ export default function PurchaseHistory() {
     else setLoading(true);
 
     try {
-      const data = await api.listPurchases(targetPage, PAGE_SIZE);
+      const condition = TAB_STATUSES[tab] ? { status: TAB_STATUSES[tab] } : {};
+      const data = await api.listPurchases(targetPage, PAGE_SIZE, condition);
       const list = data?.list ?? [];
       const normalizedOrders = list.map(normalizePurchase);
 
@@ -51,15 +61,16 @@ export default function PurchaseHistory() {
   }
 
   useEffect(() => {
-    if (apiRef.current === api) return;
-    apiRef.current = api;
+    const key = `${api ? "api" : "no-api"}:${tab}`;
+    if (requestKeyRef.current === key) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
+    requestKeyRef.current = key;
     inFlightRequestRef.current = "";
     loadedPagesRef.current = new Set();
     setPage(0);
     setHasNext(true);
     loadPurchases(0, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api]);
+  }, [api, tab]);
 
   useEffect(() => {
     function handleScroll() {
@@ -75,7 +86,14 @@ export default function PurchaseHistory() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasNext, loadingMore, loading, page, api]);
+  }, [hasNext, loadingMore, loading, page, api, tab]);
+
+  function changeTab(nextTab) {
+    const next = new URLSearchParams(searchParams);
+    if (nextTab === "completed") next.delete("tab");
+    else next.set("tab", nextTab);
+    setSearchParams(next);
+  }
 
   async function handleAction(orderId, action, message) {
     await run(async () => {
@@ -90,6 +108,24 @@ export default function PurchaseHistory() {
     }, message);
   }
 
+  function goToOrderCheckout(order) {
+    navigate(`/orders/${order.orderId}/checkout`, {
+      state: {
+        orderId: order.orderId,
+        agreedPrice: order.agreedPrice,
+        item: {
+          itemId: order.item.itemId,
+          name: order.item.name,
+          imageUrl: order.item.imageUrl,
+          nickName: order.sellerNickName,
+        },
+      },
+    });
+  }
+
+  const emptyMessage =
+    tab === "pending" ? "제안 중인 내역이 없습니다." : tab === "agreed" ? "합의된 내역이 없습니다." : "아직 구매한 상품이 없습니다.";
+
   return (
     <main className="page-shell narrow-page">
       <Link className="text-button" to="/profile"><ChevronLeft size={16} /> Back to profile</Link>
@@ -98,7 +134,14 @@ export default function PurchaseHistory() {
         <p>My purchases</p>
         <h1>구매내역</h1>
       </section>
-      {orders && orders.length === 0 && <p className="quiet-message">아직 구매한 상품이 없습니다.</p>}
+      <Tabs value={tab} onValueChange={changeTab}>
+        <TabsList className="w-full">
+          <TabsTrigger value="completed" className="flex-1">구매완료</TabsTrigger>
+          <TabsTrigger value="pending" className="flex-1">제안 중인 내역</TabsTrigger>
+          <TabsTrigger value="agreed" className="flex-1">합의된 내역</TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {orders && orders.length === 0 && <p className="quiet-message">{emptyMessage}</p>}
       {orders && orders.length > 0 && (
         <ul className="order-list">
           {orders.map((order) => (
@@ -121,7 +164,7 @@ export default function PurchaseHistory() {
                 )}
                 {order.orderStatus === "ACCEPTED" && (
                   <>
-                    <Button size="sm" disabled={loading} onClick={() => handleAction(order.orderId, "PAY", "결제를 완료했습니다.")}>결제하기</Button>
+                    <Button size="sm" disabled={loading} onClick={() => goToOrderCheckout(order)}>구매하기</Button>
                     <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 취소했습니다.")}>취소</Button>
                   </>
                 )}

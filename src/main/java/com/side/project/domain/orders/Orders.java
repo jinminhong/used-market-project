@@ -51,4 +51,12 @@ public class Orders extends BaseEntity {
         this.trackingCompany = trackingCompany;
         this.trackingNumber = trackingNumber;
     }
+
+    public void updateAgreedPrice(Integer offeredPrice) {
+        this.agreedPrice = offeredPrice;
+    }
+
+    public void updateOrderStatus(OrderStatus orderStatus) {
+        this.orderStatus = orderStatus;
+    }
 }

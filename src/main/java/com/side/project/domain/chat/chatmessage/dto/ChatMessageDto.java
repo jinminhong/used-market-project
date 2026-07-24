@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Getter
 public class ChatMessageDto {
 
-    private Long roomId;
+    private Long messageId;
     private Long itemId;
     private Long senderId;
     private LocalDateTime sendAt;
@@ -19,11 +19,12 @@ public class ChatMessageDto {
     private MessageType messageType;
     private Integer offeredPrice;
     private OfferStatus offerStatus;
+    private Long orderId;
 
     @QueryProjection
-    public ChatMessageDto(Long roomId, Long itemId, Long senderId, LocalDateTime sendAt, String senderNickname, String content,
-                          MessageType messageType, Integer offeredPrice, OfferStatus offerStatus) {
-        this.roomId = roomId;
+    public ChatMessageDto(Long messageId, Long itemId, Long senderId, LocalDateTime sendAt, String senderNickname, String content,
+                          MessageType messageType, Integer offeredPrice, OfferStatus offerStatus, Long orderId) {
+        this.messageId = messageId;
         this.itemId = itemId;
         this.senderId = senderId;
         this.sendAt = sendAt;
@@ -32,6 +33,7 @@ public class ChatMessageDto {
         this.messageType = messageType;
         this.offeredPrice = offeredPrice;
         this.offerStatus = offerStatus;
+        this.orderId = orderId;
     }
 
 }

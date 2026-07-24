@@ -1,17 +1,16 @@
 package com.side.project.domain.orders;
 
-import com.side.project.domain.orders.ordersdto.OrdersResponseDto;
-import com.side.project.domain.orders.ordersdto.PurchasesPageResponseDto;
-import com.side.project.domain.orders.ordersdto.SalesPageResponseDto;
-import com.side.project.domain.orders.ordersdto.TrackingUpdateDto;
+import com.side.project.domain.orders.ordersdto.*;
 import com.side.project.web.argumentresolver.Login;
 import com.side.project.web.login.LoginMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -24,33 +23,42 @@ public class OrdersController {
     @PostMapping("/{itemId}")
     public ResponseEntity<?> orderItem(@PathVariable(name = "itemId") Long itemId,
                                        @Login LoginMember loginMember) {
-        ordersService.save(itemId , loginMember.getMemberId());
+        ordersService.save(itemId , loginMember.getMemberId() , OrderStatus.PAY_COMPLETED);
         return ResponseEntity.ok(Map.of("status","ok","message","구매가 완료되었습니다."));
+    }
+
+    @PatchMapping("/{orderId}")
+    public ResponseEntity<OrdersActionResponseDto> changeOrderStatus(@PathVariable(name = "orderId") Long orderId,
+                                               @Login LoginMember loginMember,
+                                               @RequestBody OrderActionRequest request) {
+        OrdersActionResponseDto response = ordersService.changeOrderStatus(orderId, request.action(), loginMember.getMemberId());
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/purchases")
     public ResponseEntity<PurchasesPageResponseDto> purchasesItemList(@Login LoginMember loginMember,
+                                             @RequestParam(name = "status", required = false) List<OrderStatus> statuses,
                                              @RequestParam(defaultValue = "0") int page,
                                              @RequestParam(defaultValue = "10") int size) {
         PageRequest pageRequest = PageRequest.of(page, size);
-        PurchasesPageResponseDto purchasesList = ordersService.getPurchasesList(loginMember.getMemberId(), pageRequest);
+        PurchasesPageResponseDto purchasesList = ordersService.getPurchasesList(loginMember.getMemberId(), statuses, pageRequest);
         return ResponseEntity.ok(purchasesList);
     }
 
     @GetMapping("/sales")
     public ResponseEntity<SalesPageResponseDto> salesItemList(@Login LoginMember loginMember,
-                                                              @RequestParam(required = false) OrderStatus status,
+                                                              @RequestParam(name = "status", required = false) List<OrderStatus> statuses,
                                                               @RequestParam(defaultValue = "0") int page,
                                                               @RequestParam(defaultValue = "10") int size) {
         PageRequest pageRequest = PageRequest.of(page, size);
-        SalesPageResponseDto salesList = ordersService.getSalesList(loginMember.getMemberId(), status, pageRequest);
+        SalesPageResponseDto salesList = ordersService.getSalesList(loginMember.getMemberId(), statuses, pageRequest);
         return ResponseEntity.ok(salesList);
     }
 
     @PatchMapping("/{orderId}/tracking")
     public ResponseEntity<OrdersResponseDto> registerTracking(@PathVariable Long orderId,
-                                                                @Login LoginMember loginMember,
-                                                                @Valid @RequestBody TrackingUpdateDto trackingUpdateDto) {
+                                                              @Login LoginMember loginMember,
+                                                              @Valid @RequestBody TrackingUpdateDto trackingUpdateDto) {
         OrdersResponseDto response = ordersService.registerTracking(orderId, loginMember.getMemberId(), trackingUpdateDto);
         return ResponseEntity.ok(response);
     }

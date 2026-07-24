@@ -42,6 +42,11 @@ export function normalizeItem(item, fallbackId) {
   };
 }
 
+export function formatAddress(address) {
+  if (!address?.roadAddress) return "";
+  return `[${address.zonecode}] ${address.roadAddress} ${address.detailAddress}`.trim();
+}
+
 export function normalizeMemberInfo(data) {
   if (!data) return null;
   return {
@@ -100,6 +105,20 @@ export function normalizeChatMessage(raw) {
     offeredPrice: source.offeredPrice != null ? Number(source.offeredPrice) : null,
     offerStatus: source.offerStatus ?? null,
     orderId: source.orderId ?? null,
+  };
+}
+
+export function normalizeReceivedOffer(raw) {
+  if (!raw) return null;
+  return {
+    roomId: raw.roomId ?? null,
+    messageId: raw.messageId ?? null,
+    itemId: raw.itemId ?? null,
+    itemName: raw.itemName ?? "이름 없는 상품",
+    imageUrl: raw.imageUrl || imageUrlFromThumbnail(raw.thumbnailFilename) || defaultImage(),
+    offeredPrice: raw.offeredPrice != null ? Number(raw.offeredPrice) : null,
+    buyerNickname: raw.buyerNickname ?? raw.buyerNickName ?? "",
+    sentAt: raw.sentAt ?? null,
   };
 }
 

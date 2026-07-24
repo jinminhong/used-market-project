@@ -41,6 +41,9 @@ public class ChatMessage {
 
     private Integer offeredPrice;
 
+    @Column(name = "order_id")
+    private Long orderId;
+
     @Column(nullable = false)
     private LocalDateTime sentAt;
 
@@ -88,7 +91,8 @@ public class ChatMessage {
                                    Member sender,
                                    String content,
                                    MessageType messageType,
-                                   int offeredPrice) {
+                                   int offeredPrice,
+                                   Long orderId) {
         this.chatRoom = chatRoom;
         this.sender = sender;
         this.content = content;
@@ -96,6 +100,7 @@ public class ChatMessage {
         this.messageType = messageType;
         this.offeredPrice = offeredPrice;
         this.offerStatus = OfferStatus.ACCEPTED;
+        this.orderId = orderId;
     }
 
     public void changeStatusToReject() {

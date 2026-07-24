@@ -123,11 +123,6 @@ public class ItemService {
         return new ItemDto(item);
     }
 
-    @Transactional
-    public void reserveForOffer(Item item) {
-        item.changeStatus(ItemStatus.RESERVED);
-    }
-
     public PageResponseDto searchItems(ItemSearchCondition condition, int page , int size) {
         PageRequest pageRequest = PageRequest.of(page, size);
         Slice<ItemListDto> items = itemRepository.searchItems(condition, pageRequest);

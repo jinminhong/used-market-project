@@ -5,8 +5,10 @@ import com.side.project.domain.orders.ordersdto.OrdersResponseDto;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 
-public interface OrdersRepositoryCustom {
-    Slice<OrdersResponseDto> findAllPurchases(Long memberId, Pageable pageable);
+import java.util.List;
 
-    Slice<OrdersResponseDto> findAllSales(Long memberId, OrderStatus status, Pageable pageable);
+public interface OrdersRepositoryCustom {
+    Slice<OrdersResponseDto> findAllPurchases(Long memberId, List<OrderStatus> statuses, Pageable pageable);
+
+    Slice<OrdersResponseDto> findItemsWithOrderStatus(Long memberId, List<OrderStatus> statuses, Pageable pageable);
 }

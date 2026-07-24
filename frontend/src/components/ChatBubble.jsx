@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Button } from "./ui/button.jsx";
 
 const OFFER_STATUS_LABELS = {
@@ -12,8 +13,31 @@ function formatTime(iso) {
   return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 }
 
-export default function ChatBubble({ message, isMine, isSeller, onAcceptOffer, onRejectOffer }) {
+export default function ChatBubble({ message, isMine, isSeller, sellerId, onAcceptOffer, onRejectOffer, onGoToOrderCheckout }) {
   if (message.type === "OFFER") {
+    // 원본 제안 카드는 항상 구매자가 작성하고, 수락/거절 확인 메시지는 판매자가 작성한 별도의 OFFER 메시지다.
+    const isConfirmationMessage = message.senderId != null && sellerId != null && message.senderId === sellerId;
+
+    if (isConfirmationMessage) {
+      const canPay = !isSeller && message.offerStatus === "ACCEPTED";
+      return (
+        <div className={`chat-bubble-row ${isMine ? "mine" : "theirs"}`}>
+          {!isMine && <em className="chat-bubble-sender">{message.senderNickname}</em>}
+          <div className="chat-bubble chat-bubble-system">
+            <p>{message.content}</p>
+            {canPay && (
+              message.orderId ? (
+                <Button size="sm" onClick={() => onGoToOrderCheckout?.(message)}>결제하러 가기</Button>
+              ) : (
+                <Link className="text-button" to="/profile/purchases?tab=agreed">구매내역에서 결제하기</Link>
+              )
+            )}
+          </div>
+          <span className="chat-bubble-meta">{formatTime(message.sentAt)}</span>
+        </div>
+      );
+    }
+
     const canRespond = isSeller && message.offerStatus === "PENDING";
     return (
       <div className={`chat-bubble-row ${isMine ? "mine" : "theirs"}`}>

@@ -6,6 +6,7 @@ import NotFound from "./components/NotFound.jsx";
 import Home from "./pages/Home.jsx";
 import Detail from "./pages/Detail.jsx";
 import Checkout from "./pages/Checkout.jsx";
+import OrderCheckout from "./pages/OrderCheckout.jsx";
 import Shop from "./pages/Shop.jsx";
 import Auth from "./pages/Auth.jsx";
 import Editor from "./pages/Editor.jsx";
@@ -34,6 +35,7 @@ export default function App() {
           <Route path="/items/:itemId/edit" element={<RequireAuth><Editor /></RequireAuth>} />
           <Route path="/items/:itemId" element={<Detail />} />
           <Route path="/items/:itemId/checkout" element={<RequireAuth><Checkout /></RequireAuth>} />
+          <Route path="/orders/:orderId/checkout" element={<RequireAuth><OrderCheckout /></RequireAuth>} />
           <Route path="/shop/:memberId" element={<Shop />} />
           <Route path="/profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="/profile/edit" element={<RequireAuth><ProfileEdit /></RequireAuth>} />

@@ -4,11 +4,13 @@ import com.side.project.domain.item.Item;
 import com.side.project.domain.item.repository.ItemRepository;
 import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
+import com.side.project.domain.orders.ordersdto.OrdersActionResponseDto;
 import com.side.project.domain.orders.ordersdto.OrdersResponseDto;
 import com.side.project.domain.orders.ordersdto.PurchasesPageResponseDto;
 import com.side.project.domain.orders.ordersdto.SalesPageResponseDto;
 import com.side.project.domain.orders.ordersdto.TrackingUpdateDto;
 import com.side.project.domain.orders.repository.OrdersRepository;
+import com.side.project.domain.ordershistory.OrdersHistoryService;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.exception.orders.OrdersException;
@@ -20,6 +22,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 import static com.side.project.domain.item.ItemStatus.*;
 @Slf4j
 @Service
@@ -30,9 +34,10 @@ public class OrdersService {
     private final ItemRepository itemRepository;
     private final MemberRepository memberRepository;
     private final OrdersRepository ordersRepository;
+    private final OrdersHistoryService ordersHistoryService;
 
     @Transactional
-    public void save(Long itemId, Long memberId) {
+    public Orders save(Long itemId, Long memberId ,OrderStatus orderStatus) {
         Item item = itemRepository.findByIdWithMemberForUpdate(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
         if (!item.getStatus().equals(SELLING)) {
             throw new ItemException("구매할 수 없는 상품입니다");
@@ -42,27 +47,20 @@ public class OrdersService {
         }
         Member member = memberRepository.findById(memberId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
         Orders orders = new Orders();
-        orders.createOrders(member , item ,OrderStatus.PAY_COMPLETED, item.getPrice());
+        orders.createOrders(member , item ,orderStatus, item.getPrice());
         ordersRepository.save(orders);
         item.changeStatus(RESERVED);
+        return orders;
     }
 
-    public PurchasesPageResponseDto getPurchasesList(Long memberId , Pageable pageable) {
-        Slice<OrdersResponseDto> purchases = ordersRepository.findAllPurchases(memberId ,pageable);
+    public PurchasesPageResponseDto getPurchasesList(Long memberId , List<OrderStatus> statuses, Pageable pageable) {
+        Slice<OrdersResponseDto> purchases = ordersRepository.findAllPurchases(memberId , statuses, pageable);
         return new PurchasesPageResponseDto(purchases.getContent(), purchases.hasNext());
     }
 
-    public SalesPageResponseDto getSalesList(Long memberId, OrderStatus status, Pageable pageable) {
-        Slice<OrdersResponseDto> sales = ordersRepository.findAllSales(memberId, status, pageable);
+    public SalesPageResponseDto getSalesList(Long memberId, List<OrderStatus> statuses, Pageable pageable) {
+        Slice<OrdersResponseDto> sales = ordersRepository.findItemsWithOrderStatus(memberId, statuses, pageable);
         return new SalesPageResponseDto(sales.getContent(), sales.hasNext());
-    }
-
-    @Transactional
-    public Long createOrders(Member buyer,Item item,OrderStatus orderStatus, Integer agreedPrice) {
-        Orders orders = new Orders();
-        orders.createOrders(buyer,item,orderStatus,agreedPrice);
-        ordersRepository.save(orders);
-        return orders.getId();
     }
 
     @Transactional
@@ -89,5 +87,68 @@ public class OrdersService {
                 orders.getLastModifiedDate(),
                 orders.getAgreedPrice()
         );
+    }
+
+    @Transactional
+    public OrdersActionResponseDto changeOrderStatus(Long orderId, String action, Long requesterId) {
+        Orders orders = ordersRepository.findById(orderId)
+                .orElseThrow(() -> new OrdersException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+        Item item = orders.getItem();
+        boolean isBuyer = orders.getBuyer().getId().equals(requesterId);
+        boolean isSeller = item.getSeller().getId().equals(requesterId);
+        if (!isBuyer && !isSeller) {
+            throw new OrdersException(HttpStatus.FORBIDDEN, "이 주문을 처리할 권한이 없습니다.");
+        }
+
+        OrderStatus before = orders.getOrderStatus();
+        switch (action) {
+            case "ACCEPT" -> {
+                requireStatus(before, OrderStatus.REQUESTED);
+                requireRole(isSeller, "판매자만 승인할 수 있습니다.");
+                orders.updateOrderStatus(OrderStatus.ACCEPTED);
+            }
+            case "PAY" -> {
+                requireStatus(before, OrderStatus.ACCEPTED);
+                requireRole(isBuyer, "구매자만 결제할 수 있습니다.");
+                orders.updateOrderStatus(OrderStatus.PAY_COMPLETED);
+            }
+            case "SHIP" -> {
+                requireStatus(before, OrderStatus.PAY_COMPLETED);
+                requireRole(isSeller, "판매자만 발송 처리할 수 있습니다.");
+                orders.updateOrderStatus(OrderStatus.SHIPPING);
+            }
+            case "CONFIRM" -> {
+                requireStatus(before, OrderStatus.SHIPPING);
+                requireRole(isBuyer, "구매자만 구매확정할 수 있습니다.");
+                orders.updateOrderStatus(OrderStatus.COMPLETED);
+                item.changeStatus(SOLD);
+            }
+            case "CANCEL" -> {
+                if (before == OrderStatus.COMPLETED || before == OrderStatus.CANCELED) {
+                    throw new OrdersException(HttpStatus.CONFLICT, "취소할 수 없는 주문입니다.");
+                }
+                if (before == OrderStatus.PAY_COMPLETED || before == OrderStatus.SHIPPING) {
+                    requireRole(isSeller, "판매자 동의가 필요합니다.");
+                }
+                orders.updateOrderStatus(OrderStatus.CANCELED);
+                item.changeStatus(SELLING);
+            }
+            default -> throw new OrdersException(HttpStatus.CONFLICT, "알 수 없는 action 입니다.");
+        }
+
+        ordersHistoryService.save(orders);
+        return new OrdersActionResponseDto(orders.getId(), item.getId(), orders.getOrderStatus(), item.getStatus());
+    }
+
+    private void requireStatus(OrderStatus before, OrderStatus expected) {
+        if (before != expected) {
+            throw new OrdersException(HttpStatus.CONFLICT, "잘못된 순서의 상태 변경입니다.");
+        }
+    }
+
+    private void requireRole(boolean allowed, String message) {
+        if (!allowed) {
+            throw new OrdersException(HttpStatus.FORBIDDEN, message);
+        }
     }
 }
