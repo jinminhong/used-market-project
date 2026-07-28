@@ -14,10 +14,8 @@ import com.side.project.domain.item.ItemStatus;
 import com.side.project.domain.item.repository.ItemRepository;
 import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
-import com.side.project.domain.orders.OrderStatus;
 import com.side.project.domain.orders.Orders;
 import com.side.project.domain.orders.OrdersService;
-import com.side.project.domain.orders.repository.OrdersRepository;
 import com.side.project.web.exception.chat.message.ChatMessageException;
 import com.side.project.web.exception.chat.room.ChatRoomException;
 import com.side.project.web.exception.item.ItemException;
@@ -105,7 +103,8 @@ public class ChatRoomService {
                 });
 
         ChatMessage chatMessage = chatMessageService.sendOffer(chatRoom, buyer, request);
-        return ChatRoomAndMessageDto.from(chatRoom, chatMessage);
+        Orders orders = ordersService.createNegotiationOrder(itemId, buyerId, request.offeredPrice());
+        return ChatRoomAndMessageDto.fromAccepted(chatRoom, chatMessage, orders.getId());
     }
 
     @Transactional
@@ -152,9 +151,8 @@ public class ChatRoomService {
 
         Integer offeredPrice = offeredMessage.getOfferedPrice();
 
-        Orders orders = ordersService.save(item.getId(), offeredMessage.getSender().getId(), OrderStatus.ACCEPTED);
+        Orders orders = ordersService.acceptNegotiation(item.getId(), offeredMessage.getSender().getId(), seller, offeredPrice);
         Long orderId = orders.getId();
-        orders.updateAgreedPrice(offeredPrice);
 
         ChatMessage chatMessage = chatMessageService.acceptOffer(chatRoom, findSeller, offeredMessage, orderId);
         return ChatRoomAndMessageDto.fromAccepted(chatRoom, chatMessage, orderId);
