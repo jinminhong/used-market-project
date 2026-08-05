@@ -12,6 +12,7 @@ const PAGE_SIZE = 10;
 const TAB_STATUSES = {
   pending: ["REQUESTED"],
   agreed: ["ACCEPTED"],
+  completed: ["PAY_COMPLETED", "SHIPPING", "COMPLETED"],
 };
 
 export default function PurchaseHistory() {
@@ -41,7 +42,7 @@ export default function PurchaseHistory() {
     else setLoading(true);
 
     try {
-      const condition = TAB_STATUSES[tab] ? { status: TAB_STATUSES[tab] } : {};
+      const condition = { status: TAB_STATUSES[tab] };
       const data = await api.listPurchases(targetPage, PAGE_SIZE, condition);
       const list = data?.list ?? [];
       const normalizedOrders = list.map(normalizePurchase);
