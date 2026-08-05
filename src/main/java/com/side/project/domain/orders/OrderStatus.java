@@ -3,7 +3,7 @@ package com.side.project.domain.orders;
 public enum OrderStatus {
     REQUESTED,
     REJECTED,
-    ACCEPTED,
+    RESERVED,
     CANCELED,
     PAY_COMPLETED,
     SHIPPING,

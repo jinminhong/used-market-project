@@ -44,7 +44,7 @@ public class ChatRoomService {
 
     @Transactional
     public ChatRoomResponse createChatRoom(Long itemId , Long buyerId) {
-        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다."));
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."));
 
         Long sellerId = item.getSeller().getId();
         if (sellerId.equals(buyerId)) {
@@ -85,9 +85,9 @@ public class ChatRoomService {
 
     @Transactional
     public ChatRoomAndMessageDto createOffer(Long itemId, Long buyerId, ChatRoomRequest request) {
-        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
         if (item.getStatus() != ItemStatus.SELLING) {
-            throw new ItemException("이미 거래 중이거나 완료된 상품입니다.");
+            throw new ItemException(HttpStatus.CONFLICT, "이미 거래 중이거나 완료된 상품입니다.");
         }
         Long sellerId = item.getSeller().getId();
         if (sellerId.equals(buyerId)) {
@@ -108,35 +108,15 @@ public class ChatRoomService {
     }
 
     @Transactional
-    public ChatRoomAndMessageDto rejectOffer(Long roomId, Long memberId, Long messageId) {
-        ChatRoom chatRoom = chatRoomContainMember(roomId, memberId);
+    public ChatRoomAndMessageDto rejectOffer(Long roomId, Long sellerId, Long messageId) {
+        ChatRoom chatRoom = chatRoomContainMember(roomId, sellerId);
 
         Item item = chatRoom.getItem();
-        if (!item.getSeller().getId().equals(memberId)) {
+        if (!item.getSeller().getId().equals(sellerId)) {
             throw new UnauthorizedException("제안을 거절할 권한이 없습니다.");
         }
 
-        if (item.getStatus() != ItemStatus.SELLING) {
-            throw new ItemException("이미 거래 중이거나 완료된 상품입니다.");
-        }
-
-        Member seller = memberRepository.findById(memberId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
-
-        ChatMessage chatMessage = chatMessageService.rejectOffer(chatRoom, seller, messageId);
-
-        chatRoom.updateLastMessageAt(chatMessage.getSentAt());
-        return ChatRoomAndMessageDto.from(chatRoom, chatMessage);
-    }
-
-    @Transactional
-    public ChatRoomAndMessageDto acceptOffer(Long roomId, Long seller, Long messageId) {
-        ChatRoom chatRoom = chatRoomContainMember(roomId, seller);
-
-        Item item = chatRoom.getItem();
-        if (!item.getSeller().getId().equals(seller)) {
-            throw new UnauthorizedException("제안을 수락할 권한이 없습니다.");
-        }
-        Member findSeller = memberRepository.findById(seller).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+        Member findSeller = memberRepository.findById(sellerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
 
         ChatMessage offeredMessage = chatMessageService.getChatMessageById(messageId);
         if (!offeredMessage.getChatRoom().getId().equals(roomId) || offeredMessage.getMessageType() != MessageType.OFFER) {
@@ -146,12 +126,40 @@ public class ChatRoomService {
             throw new ChatMessageException("이미 처리된 제안입니다.");
         }
         if (item.getStatus() != ItemStatus.SELLING) {
-            throw new ItemException("이미 거래 중이거나 완료된 상품입니다.");
+            throw new ItemException(HttpStatus.CONFLICT, "이미 거래 중이거나 완료된 상품입니다.");
+        }
+
+        Orders orders = ordersService.rejectNegotiation(item.getId(), offeredMessage.getSender().getId(), sellerId);
+        Long orderId = orders.getId();
+
+        ChatMessage chatMessage = chatMessageService.rejectOffer(chatRoom, findSeller, offeredMessage , orderId);
+        return ChatRoomAndMessageDto.from(chatRoom, chatMessage);
+    }
+
+    @Transactional
+    public ChatRoomAndMessageDto acceptOffer(Long roomId, Long sellerId, Long messageId) {
+        ChatRoom chatRoom = chatRoomContainMember(roomId, sellerId);
+
+        Item item = chatRoom.getItem();
+        if (!item.getSeller().getId().equals(sellerId)) {
+            throw new UnauthorizedException("제안을 수락할 권한이 없습니다.");
+        }
+        Member findSeller = memberRepository.findById(sellerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+
+        ChatMessage offeredMessage = chatMessageService.getChatMessageById(messageId);
+        if (!offeredMessage.getChatRoom().getId().equals(roomId) || offeredMessage.getMessageType() != MessageType.OFFER) {
+            throw new ChatMessageException("해당 채팅방의 제안이 아닙니다.");
+        }
+        if (offeredMessage.getOfferStatus() != OfferStatus.PENDING) {
+            throw new ChatMessageException("이미 처리된 제안입니다.");
+        }
+        if (item.getStatus() != ItemStatus.SELLING) {
+            throw new ItemException(HttpStatus.CONFLICT, "이미 거래 중이거나 완료된 상품입니다.");
         }
 
         Integer offeredPrice = offeredMessage.getOfferedPrice();
 
-        Orders orders = ordersService.acceptNegotiation(item.getId(), offeredMessage.getSender().getId(), seller, offeredPrice);
+        Orders orders = ordersService.acceptNegotiation(item.getId(), offeredMessage.getSender().getId(), sellerId, offeredPrice);
         Long orderId = orders.getId();
 
         ChatMessage chatMessage = chatMessageService.acceptOffer(chatRoom, findSeller, offeredMessage, orderId);

@@ -38,12 +38,12 @@ public class OrdersService {
 
     @Transactional
     public Orders save(Long itemId, Long buyerId ,OrderStatus orderStatus) {
-        Item item = itemRepository.findByIdWithMemberForUpdate(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMemberForUpdate(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
         if (!item.getStatus().equals(SELLING)) {
-            throw new ItemException("구매할 수 없는 상품입니다");
+            throw new ItemException(HttpStatus.CONFLICT, "구매할 수 없는 상품입니다");
         }
         if (item.getSeller().getId().equals(buyerId)) {
-            throw new ItemException("본인이 등록한 상품은 구매할 수 없습니다.");
+            throw new ItemException(HttpStatus.FORBIDDEN, "본인이 등록한 상품은 구매할 수 없습니다.");
         }
         Member member = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
         Orders orders = new Orders();
@@ -53,19 +53,14 @@ public class OrdersService {
         return orders;
     }
 
-    /**
-     * 채팅 가격 제안 시 REQUESTED 주문을 생성한다. 같은 (buyer, item) 조합에 이미 REQUESTED 주문이 있으면
-     * 새로 만들지 않고 제안가만 갱신한다. 한 아이템에 여러 구매자가 동시에 제안할 수 있어야 하므로
-     * item 행을 잠그거나 item 상태를 바꾸지 않는다.
-     */
     @Transactional
     public Orders createNegotiationOrder(Long itemId, Long buyerId, Integer offeredPrice) {
-        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
         if (!item.getStatus().equals(SELLING)) {
-            throw new ItemException("구매할 수 없는 상품입니다");
+            throw new ItemException(HttpStatus.CONFLICT, "구매할 수 없는 상품입니다");
         }
         if (item.getSeller().getId().equals(buyerId)) {
-            throw new ItemException("본인이 등록한 상품은 구매할 수 없습니다.");
+            throw new ItemException(HttpStatus.FORBIDDEN, "본인이 등록한 상품은 구매할 수 없습니다.");
         }
         Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
 
@@ -81,13 +76,22 @@ public class OrdersService {
                 });
     }
 
-    /**
-     * 채팅에서 판매자가 제안을 수락할 때, createNegotiationOrder가 만든 REQUESTED 주문을 찾아 ACCEPTED로 전이시킨다.
-     * 같은 아이템의 다른 구매자 REQUESTED 주문들은 REJECTED로 일괄 처리된다.
-     */
+    @Transactional
+    public Orders rejectNegotiation(Long itemId, Long buyerId, Long sellerId) {
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
+        Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
+        Orders orders = ordersRepository.findByBuyerAndItemAndOrderStatus(buyer, item, OrderStatus.REQUESTED)
+                .orElseThrow(() -> new OrdersException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+
+        requireRole(item.getSeller().getId().equals(sellerId), "판매자만 거절할 수 있습니다.");
+        rejectAccept(orders);
+        ordersHistoryService.save(orders);
+        return orders;
+    }
+
     @Transactional
     public Orders acceptNegotiation(Long itemId, Long buyerId, Long sellerId, Integer offeredPrice) {
-        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMemberForUpdate(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
         Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
         Orders orders = ordersRepository.findByBuyerAndItemAndOrderStatus(buyer, item, OrderStatus.REQUESTED)
                 .orElseThrow(() -> new OrdersException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
@@ -101,9 +105,13 @@ public class OrdersService {
     }
 
     private void applyAccept(Orders orders, Item item) {
-        orders.updateOrderStatus(OrderStatus.ACCEPTED);
+        orders.updateOrderStatus(OrderStatus.RESERVED);
         item.changeStatus(RESERVED);
         ordersRepository.rejectOtherOrders(item.getId(), orders.getId());
+    }
+
+    private void rejectAccept(Orders orders) {
+        orders.updateOrderStatus(OrderStatus.REJECTED);
     }
 
     public PurchasesPageResponseDto getPurchasesList(Long memberId , List<OrderStatus> statuses, Pageable pageable) {
@@ -161,7 +169,7 @@ public class OrdersService {
                 applyAccept(orders, item);
             }
             case "PAY" -> {
-                requireStatus(before, OrderStatus.ACCEPTED);
+                requireStatus(before, OrderStatus.RESERVED);
                 requireRole(isBuyer, "구매자만 결제할 수 있습니다.");
                 orders.updateOrderStatus(OrderStatus.PAY_COMPLETED);
             }

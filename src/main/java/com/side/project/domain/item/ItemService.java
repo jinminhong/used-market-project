@@ -14,6 +14,7 @@ import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.login.LoginMember;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.HttpStatus;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,7 +70,7 @@ public class ItemService {
     }
 
     public ItemDto findByIdToDto(Long itemId) {
-         return findByIdWithMember(itemId).map(ItemDto::new).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+         return findByIdWithMember(itemId).map(ItemDto::new).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
     }
 
     public List<ItemDto> findAll() {
@@ -81,7 +82,7 @@ public class ItemService {
 
     @Transactional
     public void delete(Long itemId , LoginMember loginMember) {
-        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
         if (!item.getSeller().getLoginId().equals(loginMember.getLoginId())) {
             throw new UnauthorizedException("상품을 삭제할 권한이 없습니다");
         }
@@ -91,10 +92,10 @@ public class ItemService {
     @Transactional
     public ItemDto update(Long itemId , ItemUpdateDto itemUpdateDto ,List<MultipartFile> multipartFiles, String loginId) throws IOException {
         Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new ItemException("상품을 찾을 수 없습니다. id=" + itemId));
+                .orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다. id=" + itemId));
 
         if (!item.getSeller().getLoginId().equals(loginId)) {
-            throw new ItemException("상품을 수정할 권한이 없습니다");
+            throw new ItemException(HttpStatus.FORBIDDEN, "상품을 수정할 권한이 없습니다");
         }
         List<Long> deletedFileIds = itemUpdateDto.getDeletedFileIds();
 

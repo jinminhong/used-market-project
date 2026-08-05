@@ -57,14 +57,14 @@ public class ChatMessageService {
     }
 
     @Transactional
-    public ChatMessage rejectOffer(ChatRoom chatRoom , Member seller , Long messageId) {
-        ChatMessage offerChatMessage = getChatMessageById(messageId);
+    public ChatMessage rejectOffer(ChatRoom chatRoom , Member seller , ChatMessage offerChatMessage, Long orderId) {
         offerChatMessage.changeStatusToReject();
 
-        String message = "거절합니다.";
+        String message = "제안을 거절합니다.";
         ChatMessage chatMessage = new ChatMessage();
-        chatMessage.rejectOfferMessage(chatRoom,seller,message,MessageType.OFFER , offerChatMessage.getOfferedPrice());
+        chatMessage.rejectOfferMessage(chatRoom,seller,message,MessageType.OFFER , offerChatMessage.getOfferedPrice() ,orderId);
         chatMessageRepository.save(chatMessage);
+        chatRoom.updateLastMessageAt(chatMessage.getSentAt());
 
         return chatMessage;
     }

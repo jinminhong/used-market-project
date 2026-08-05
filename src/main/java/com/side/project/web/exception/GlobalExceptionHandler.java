@@ -10,6 +10,7 @@ import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.exception.orders.OrdersException;
 import com.side.project.web.exception.wishlist.WishListException;
 import com.side.project.web.exception.wishlist.WishListNotFoundException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -32,7 +33,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ItemException.class)
     public ResponseEntity itemException(ItemException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        return ResponseEntity.status(e.getHttpStatus()).body(e.getMessage());
     }
 
     @ExceptionHandler(LoginFailException.class)
@@ -68,6 +69,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OrdersException.class)
     public ResponseEntity ordersException(OrdersException e) {
         return ResponseEntity.status(e.getHttpStatus()).body(e.getMessage());
+    }
+
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity pessimisticLockingFailureException(PessimisticLockingFailureException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body("다른 사용자가 처리 중인 상품입니다. 잠시 후 다시 시도해주세요.");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
