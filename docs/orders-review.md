@@ -1,56 +1,50 @@
-# Orders(구매/판매) 백엔드 리뷰
+# Orders(구매/판매/배송) 백엔드 리뷰
 
-`domain/orders/**`, `domain/item/Item.java`(상태 전이 관련), `web/exception/GlobalExceptionHandler.java`를 대상으로 한 코드 리뷰 기록. 기준 문서는 [`docs/api/orders.md`](api/orders.md)(즉시구매 계약 + 상태전이 미구현 제안)와 [`docs/ORDER_LIFECYCLE_GUIDE.md`](ORDER_LIFECYCLE_GUIDE.md)(상태전이 상세 설계)다. 현재 구현은 "즉시구매(1단계)"까지만 있고 `REQUESTED`/`ACCEPTED`/`CANCELED`/`SHIPPING`은 설계만 있는 상태다.
+`domain/orders/**`, `domain/ordershistory/**`, `domain/item/Item.java`(상태 전이 관련), `web/exception/GlobalExceptionHandler.java`를 대상으로 한 코드 리뷰 기록. 기준 문서는 [`docs/api/orders.md`](api/orders.md)다. 즉시구매, 채팅 가격제안 연동, 상태전이(PATCH), 운송장 등록까지 이미 구현되어 있고, 아래는 그 위에서 남아 있는 이슈다.
+
+## 해결됨 (과거에 미구현/이슈였던 항목)
+
+- **주문 상태전이 로직 구현 완료** — `OrderStatus`에 `REJECTED`/`SHIPPING`이 추가되어 총 7종(`REQUESTED, REJECTED, ACCEPTED, CANCELED, PAY_COMPLETED, SHIPPING, COMPLETED`)이 되었고, `PATCH /api/orders/{orderId}`(`OrdersService.changeStatus`)가 ACCEPT/PAY/SHIP/CONFIRM/CANCEL 액션과 권한·상태 검증(403/409)을 모두 구현했다.
+- **협상가(`agreedPrice`) 저장** — `Orders.agreedPrice`가 즉시구매(`item.getPrice()`)와 채팅 제안(`ChatMessage.offeredPrice`) 양쪽에서 채워진다.
+- **운송장(배송) 관리** — `Orders.trackingCompany`/`trackingNumber` 필드와 `PATCH /api/orders/{orderId}/tracking`이 구현되어, 판매자가 발송 후 운송장 정보를 등록할 수 있다.
+- **상태변경 감사로그** — `domain/ordershistory`(`OrdersHistory` + `OrdersHistoryService.save`)가 상태가 바뀔 때마다 스냅샷을 append한다.
+- **목록 조회 기본 필터 수정 완료** — `PurchaseHistory.jsx`가 탭마다 `TAB_STATUSES`(`REQUESTED`/`ACCEPTED`/`PAY_COMPLETED,SHIPPING,COMPLETED`)로 `status`를 항상 명시적으로 전달하도록 바뀌어, "구매완료" 탭에 취소·거절된 주문까지 섞여 보이던 문제가 해결됨.
+- **`ItemException`이 `HttpStatus` 필드를 갖도록 리팩터링 완료** — `OrdersException`/`ChatRoomException`과 동일하게 생성자에서 `HttpStatus`를 받고 `GlobalExceptionHandler.itemException`이 `e.getHttpStatus()`로 응답하도록 바뀌었으며, `OrdersService`/`ItemService.update` 등 호출부도 404/409/403을 상황에 맞게 던지도록 갱신됨.
+- **락 타임아웃 예외 매핑 추가 완료** — `GlobalExceptionHandler`에 `PessimisticLockingFailureException` 핸들러가 추가되어 409로 응답한다. Hibernate가 던지는 `PessimisticLockException`/`LockTimeoutException`은 Spring이 이 예외로 변환해 전달하므로 함께 커버됨.
 
 ## 남은 이슈
 
-### 1. `Item.updateItem`의 `status` 뒷문이 주문 흐름과 완전히 분리되어 있어 실제 이중판매 경로가 된다
+### 1. `Item.updateItem`의 `status` 뒷문이 여전히 열려 있다
 
-`ItemUpdateDto.status`가 그대로 노출되어 있어, 판매자가 상품 수정 API로 `Orders`와 무관하게 `Item.status`를 임의로 바꿀 수 있다. 예를 들어 구매 완료로 `Item`이 `RESERVED`, `Orders`가 `PAY_COMPLETED`인 상태에서 판매자가 `status=SELLING`으로 되돌리면, `Orders` 레코드는 고아가 되고 두 번째 구매자가 같은 상품을 다시 구매할 수 있다. `ORDER_LIFECYCLE_GUIDE.md` 6절이 정확히 이 뒷문을 지적하고 있는데 아직 코드에 남아 있다.
+`Item.java:102-103` — `ItemUpdateDto.getStatus()`가 null이 아니면 그대로 반영된다. 판매자가 상품 수정 API로 `Orders`/주문 상태전이와 무관하게 `Item.status`를 임의로 바꿀 수 있어, 정교한 주문 상태 머신을 만들어도 이 경로로 이중판매·상태 불일치가 여전히 가능하다([`docs/items-review.md`](items-review.md)와 동일 이슈).
 
-### 2. 락 타임아웃 예외가 처리되지 않는다
+### 2. 운송장 등록에 주문 상태 가드가 없다
 
-`ItemRepository.findByIdWithMemberForUpdate`는 `PESSIMISTIC_WRITE` + 3000ms 타임아웃으로 보호되어 있지만, 락을 3초 내에 못 얻으면 `LockTimeoutException`/`PessimisticLockException`이 던져지고 `GlobalExceptionHandler`에 핸들러가 없어 500으로 샌다. 트래픽이 몰리는 "핫한 매물" 시나리오에서 노출될 문제다.
+`OrdersService.registerTracking`은 판매자 본인 여부만 검증하고 `orders.getOrderStatus()`가 어떤 값이어도 통과시킨다. `REQUESTED`/`CANCELED` 단계에서도 운송장을 등록할 수 있어, 정상 흐름(`PAY_COMPLETED` 이후에만 등록)을 강제하려면 상태 검증을 추가해야 한다.
 
-### 3. 주문 취소/환불 기능이 전혀 없어 한 번 구매하면 아이템이 사실상 영구 `RESERVED`가 된다
+### 3. 채팅 가격제안 "거절" 시 대응하는 `REQUESTED` 주문이 취소되지 않는다
 
-`OrderStatus`에 `CANCELED`/`COMPLETED`가 정의만 되어 있고 전이 메서드가 없다. 한 번 구매가 일어나면 아이템을 `SOLD`로 만들 방법도, `SELLING`으로 되돌릴 방법도 API상 없다. 유일한 우회로가 1번의 `Item` 수정 백도어라, 쓰면 `Orders` 레코드가 고아로 남는 모순 상태가 된다.
+`ChatRoomService.rejectOffer`는 `ChatMessage.offerStatus`만 `REJECTED`로 바꿀 뿐, `OrdersService.createNegotiationOrder`가 만들어 둔 `REQUESTED` `Orders` 레코드는 그대로 남는다(취소 처리 없음). 목록 조회 기본 필터는 수정됐지만(위 "해결됨" 참고), 이 orphan 주문은 여전히 `REQUESTED` 상태이므로 `PurchaseHistory.jsx`의 "제안 중인 내역" 탭(`status=REQUESTED`)에는 거절된 제안이 계속 노출된다. `rejectOffer`에서도 `orders.updateOrderStatus(REJECTED)` 같은 처리를 함께 호출해야 한다([`docs/chat-review.md`](chat-review.md)와 교차 참고).
 
-### 4. `docs/api/orders.md`가 명시한 409가 실제로는 404로 나간다
+### 4. 자동취소 스케줄러가 로그만 남기고 실제로 아무것도 하지 않는다
 
-"구매할 수 없는 상품입니다"/"본인이 등록한 상품은 구매할 수 없습니다"를 문서는 409로 약속했지만, 실제로 `OrdersService.save()`는 두 경우 모두 `ItemException`을 던지고 이는 항상 404로 고정 매핑된다. `ItemException`이 상태를 담는 필드가 없는 단순 예외라 메시지별 분기가 불가능하다.
+`OrdersAutoCancelScheduler`는 매시 정각 실행되지만 `PAY_COMPLETED` 상태로 오래 방치된 주문을 실제로 `CANCELED`/`Item.SELLING`으로 되돌리는 로직이 없다(구현 자체가 비어 있음).
 
-### 5. `Orders` 엔티티/리포지토리에 상태전이 구현에 필요한 최소한의 골격이 없다
+### 5. SweetTracker 등 외부 택배사 실시간 배송조회는 여전히 미구현
 
-- ~~`Orders`는 `id`/`buyer`/`item`/`orderStatus` 4개 필드뿐이라 협상가(`agreedPrice`)를 저장할 곳이 없다.~~ **해결됨** — `Orders.agreedPrice`(Integer) 필드가 추가되어 즉시구매(`item.getPrice()`)/오퍼 수락(`ChatMessage.offeredPrice`) 양쪽 모두 협상 성사 가격을 저장한다(`OrdersService.save`/`createOrders`, `docs/chat-review.md` 참고). `OrdersResponseDto`/QueryDSL 프로젝션(`OrdersRepositoryImpl`)에도 노출되어 있다. 단, 이 필드가 채워지는 진입점은 이 문서와 `ORDER_LIFECYCLE_GUIDE.md`가 상정한 `createNegotiatedOrder`가 아니라 실제로는 `ChatRoomService.acceptOffer` → `OrdersService.createOrders`다.
-- `accept()`/`pay()`/`ship()`/`confirm()`/`cancel()` 같은 상태 검증 포함 전이 메서드가 없다.
-- `orderId` 기준 fetch-join 조회가 없다 — `Orders.buyer`/`Orders.item`이 둘 다 `LAZY`라서 plain `findById`로 권한 체크를 하면 추가 쿼리가 2~3번 더 나간다.
-- 자동취소 스케줄러용 쿼리도, `@EnableScheduling`도 없다.
-
-### 6. `OrderStatus`에 `SHIPPING`이 아직 없다
-
-`PAY_COMPLETED→SHIPPING→COMPLETED` 흐름을 표현할 수 없다.
-
-### 7. 목록 조회 필터가 상태전이 확장을 전제하지 않은 하드코딩이다
-
-`findAllPurchases`/`findAllSales`가 `orderStatus.in(COMPLETED, PAY_COMPLETED)`로 고정되어 있어, 상태전이가 추가되면 `REQUESTED`/`ACCEPTED`/`SHIPPING` 주문이 목록에서 아예 누락된다. **이미 실제로 발생 중** — 채팅 오퍼 수락(`ChatRoomService.acceptOffer`)이 `OrderStatus.ACCEPTED` 주문을 생성하므로, 이 주문은 구매자의 `GET /api/orders/purchases`에는 전혀 나타나지 않고 판매자도 `GET /api/orders/sales?status=ACCEPTED`로 명시적으로 필터링해야만 볼 수 있다(`docs/chat-review.md` 5번 참고). `agreedPrice` 필드는 채워지지만 이 필터 문제 때문에 기본 화면에서는 보이지 않는다.
+`frontend/src/api/delivery.js`의 `trackShipment`는 SweetTracker API 연동 골격만 있고 프로젝트 어디에서도 호출되지 않는 죽은 코드다(`.env`에 `VITE_SWEETTRACKER_KEY`도 설정된 적 없음). 현재 구현된 "배송 관리"는 판매자가 택배사명/운송장번호 문자열을 직접 입력해 저장하는 수준(위 "해결됨" 항목)이며, 실시간 배송 상태 조회는 별개의 선택적 확장 과제로 남아 있다. 필요 없다고 판단되면 `trackShipment`/`CARRIERS` 관련 죽은 코드를 함께 정리하는 것도 방법이다.
 
 ## 잘 되어 있는 부분
 
-- **즉시구매 동시성은 실제로 안전하다.** `OrdersService.save()`가 `findByIdWithMemberForUpdate`(`@Lock(PESSIMISTIC_WRITE)` + 3000ms 타임아웃)를 호출해, 동시 구매 시도 시 두 번째 트랜잭션이 row 락에 걸려 대기하다 재조회 후 정상 거부된다. row-level 락으로 race를 원천 차단하는 구조.
-- 트랜잭션 경계 패턴이 채팅 도메인과 일관적이다(클래스 레벨 readOnly + 쓰기 메서드만 override).
-- 목록 조회 쿼리가 QueryDSL DTO 프로젝션으로 join해 N+1이 없고, `limit(size+1)` + `SliceImpl` 트릭도 다른 도메인과 일관적이다.
-- 기본 무결성 체크(SELLING 상태 검증, 본인 상품 구매 방지)는 즉시구매 경로에서 정상 동작한다.
-- `ORDER_LIFECYCLE_GUIDE.md`가 상태 머신 표, 코드 스니펫, 예외 3종, 스케줄러, 채팅 OFFER 연동, 구현 순서까지 실행 가능한 수준으로 구체적이다.
+- 즉시구매 동시성은 실제로 안전하다 — `findByIdWithMemberForUpdate`(비관적 락)로 동시 구매 시도 시 두 번째 트랜잭션이 정상적으로 거부된다.
+- 상태전이(`changeStatus`) 자체는 `requireStatus`/`requireRole`로 역행·권한 위반을 꼼꼼히 막고 있고, 채팅 수락 경로(`acceptNegotiation`)와 `applyAccept` 로직을 공유해 중복이 없다.
+- 상태 변경마다 `ordershistory`에 감사로그가 남아 추적이 가능하다.
+- 목록 조회 쿼리가 QueryDSL DTO 프로젝션으로 N+1 없이 조회되고, `limit(size+1)` + `SliceImpl` 트릭도 다른 도메인과 일관적이다.
 
 ## 다음에 손대면 좋을 순서
 
-1. **`Item.status` 뒷문 제거를 최우선으로 한다** — `ItemUpdateDto.status` 필드와 `Item.updateItem`의 상태 분기를 삭제. 이걸 먼저 안 하면 아래에서 아무리 정교한 상태 머신을 만들어도 우회로가 남는다.
-2. **`Orders` 엔티티 확장** — ~~`agreedPrice` 필드~~(구현됨, 위 5번 참고), `accept()`/`pay()`/`ship()`/`confirm()`/`cancel()` 전이 메서드 추가. `OrderStatus`에 `SHIPPING` 추가. 예외 3종 신설 후 매핑.
-3. **`OrdersRepository`에 fetch-join 조회 메서드 추가** — `orderId` 하나로 `buyer`/`item`/`item.seller`까지 한 번에 가져오는 쿼리.
-4. **`OrdersService.changeStatus` + `OrdersController` PATCH 구현** — `ORDER_LIFECYCLE_GUIDE.md` 3~4절 그대로.
-5. **`ItemException`의 404 고정 매핑 문제 정리** — 즉시구매 에러(404 vs 409)를 구분할 수 있도록 예외 분리, 문서가 약속한 409와 실제 코드를 일치시킨다.
-6. **락 타임아웃 예외 매핑 추가** — `PessimisticLockException`/`LockTimeoutException` → 409/503.
-7. **목록 조회 필터 확장** — `orderStatus.in(...)`을 CANCELED만 제외하는 형태로 넓혀 `ACCEPTED` 등도 기본 목록에 노출(DTO의 `orderStatus`/`agreedPrice` 필드 자체는 이미 노출되어 있음, 위 5/7번 참고).
-8. **자동취소 스케줄러는 마지막** — 상태전이 자체가 동작해야 의미가 있으므로 가장 후순위.
-</content>
+1. **채팅 거절 시 `REQUESTED` 주문도 함께 취소** — `rejectOffer`에 `orders.updateOrderStatus(REJECTED)` 호출 추가(위 3번, `chat-review.md`와 동일 작업).
+2. **`Item.status` 뒷문 제거** — `ItemUpdateDto.status` 필드와 `Item.updateItem`의 상태 분기 삭제.
+3. **운송장 등록에 상태 가드 추가** — `PAY_COMPLETED` 이후에만 등록 허용.
+4. **자동취소 스케줄러 실제 구현** — 나머지가 안정된 뒤 가장 후순위.
+5. (우선순위 낮음) SweetTracker 연동 여부 결정 — 필요 없으면 죽은 코드(`trackShipment`) 정리, 필요하면 API 키 발급/백엔드 프록시 설계.

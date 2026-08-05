@@ -40,9 +40,17 @@
 
 거절(reject, `POST /api/chat/rooms/{roomId}/offer/{messageId}/reject`)은 `messageId`로 `ChatMessage`를 전역 조회할 뿐, accept에서 새로 추가한 것과 같은 "해당 `roomId` 소속인지 / `messageType == OFFER`인지 / `offerStatus == PENDING`인지" 검증이 없다. reject는 side effect가 메시지 상태 변경뿐이라 상대적으로 영향이 적어 이번 accept 작업 범위에서는 그대로 뒀지만, 동일한 검증을 reject에도 넣는 편이 일관적이다. 권한 오류도 `ChatRoomException`이 아닌 `UnauthorizedException`(401)을 쓰는 점은 accept와 동일하게 유지됨(의도적 설계인지 확인 필요).
 
-### 5. `Orders.agreedPrice`가 있어도 기본 목록 조회에서는 `ACCEPTED` 주문이 보이지 않음
+### 5. (해결됨) `status` 파라미터 없이 조회하면 필터링이 아예 없어져, 오히려 관계없는 상태가 다 섞여 보임
 
-오퍼 수락으로 생성되는 주문은 `OrderStatus.ACCEPTED`인데, `OrdersRepositoryImpl.findAllPurchases`는 `orderStatus.in(COMPLETED, PAY_COMPLETED)`로 고정되어 있고 `findAllSales`도 `status` 파라미터가 없으면 동일한 필터를 쓴다(`docs/orders-review.md` 7번 참고). 즉 구매자의 "구매 내역"에는 수락된 제안 주문이 전혀 안 뜨고, 판매자도 `GET /api/orders/sales?status=ACCEPTED`로 명시적으로 필터링해야만 보인다 — `agreedPrice` 자체는 정상 저장되지만 노출 경로가 좁다.
+과거에는 `orderStatus.in(COMPLETED, PAY_COMPLETED)` 고정 필터라 `ACCEPTED` 주문이 안 보이는 문제였고, 그 다음엔 `OrdersRepositoryImpl.orderStatusIn`이 `statuses`가 비어있으면 아예 조건을 걸지 않아(`null` 반환) `CANCELED`/`REJECTED`까지 다 섞여 보이는 문제였다. 지금은 `PurchaseHistory.jsx`가 탭마다 `TAB_STATUSES`로 `status`를 항상 명시적으로 전달하도록 고쳐져 해결됨(상세는 [`docs/orders-review.md`](orders-review.md) "해결됨" 섹션 참고).
+
+### 6. `rejectOffer`가 대응하는 `REQUESTED` 주문을 취소하지 않음
+
+`createOffer` 시점에 이미 `OrdersService.createNegotiationOrder`로 `REQUESTED` 주문이 생성되는데(`docs/api/chat.md`의 offer 생성 섹션 참고), `rejectOffer`는 `ChatMessage.offerStatus`만 `REJECTED`로 바꿀 뿐 이 `Orders` 레코드는 그대로 둔다. 위 5번(기본 조회 필터)은 고쳐졌지만, 이 orphan 주문은 여전히 `REQUESTED` 상태라 "제안 중인 내역" 탭(`status=REQUESTED`)에는 거절된 제안이 계속 노출된다(`docs/orders-review.md` 3번과 동일 이슈).
+
+### 7. accept/reject가 상태 변경(멱등하지 않은 갱신)인데 HTTP 201 CREATED를 반환함
+
+`POST .../offer/{messageId}/accept`, `POST .../offer/{messageId}/reject` 둘 다 새 리소스를 만드는 게 아니라 기존 제안의 상태를 바꾸는 동작에 가까운데(부가적으로 새 시스템 메시지 레코드가 생기긴 함) `HttpStatus.CREATED`(201)를 반환한다. 의미상으로는 200 OK가 더 적절하지만, 프론트가 이미 이 값을 기준으로 동작하므로 변경 시 프론트도 함께 확인해야 한다.
 
 ## 잘 되어 있는 부분
 
@@ -53,7 +61,8 @@
 
 ## 다음에 손대면 좋을 순서
 
-1. `rejectOffer`에도 accept와 동일한 방/타입/상태 검증 추가(위 4번), 판매자 역제안 지원 여부 결정 — 역제안을 지원한다면 `/offer` 호출 시 판매자/구매자 분기 처리도 함께.
-2. `findAllPurchases`/`findAllSales`의 상태 필터를 넓혀 `ACCEPTED` 주문도 기본 목록에 노출(위 5번, `docs/orders-review.md` 7번과 동일 작업).
-3. STOMP 예외를 `/user/queue/errors` 개인 큐로 클라이언트에 돌려주기 — Principal 연동(커스텀 `DefaultHandshakeHandler`)이 선행되어야 한다.
-4. `DataIntegrityViolationException` → 409 매핑, `createOffer`의 채팅방 중복 조회 정리(둘 다 우선순위 낮음).
+1. `rejectOffer`에서 대응하는 `REQUESTED` 주문도 함께 `REJECTED`로 전이(위 6번, `docs/orders-review.md`와 동일 작업) — 방치된 orphan 주문이 목록에 그대로 노출되는 실사용 문제라 우선순위가 높다.
+2. `rejectOffer`에도 accept와 동일한 방/타입/상태 검증 추가(위 4번), 판매자 역제안 지원 여부 결정 — 역제안을 지원한다면 `/offer` 호출 시 판매자/구매자 분기 처리도 함께.
+3. accept/reject 응답 상태코드를 200으로 정리할지 결정(위 7번, 프론트 영향도 확인 필요).
+4. STOMP 예외를 `/user/queue/errors` 개인 큐로 클라이언트에 돌려주기 — Principal 연동(커스텀 `DefaultHandshakeHandler`)이 선행되어야 한다.
+5. `DataIntegrityViolationException` → 409 매핑, `createOffer`의 채팅방 중복 조회 정리(둘 다 우선순위 낮음).

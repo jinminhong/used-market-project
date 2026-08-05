@@ -22,6 +22,8 @@
 
 **상태**: 구현됨(REST 엔드포인트, STOMP 아님). 채팅방이 없으면 생성 후 OFFER 메시지를 저장하고 `/topic/chat/rooms/{roomId}`로도 브로드캐스트한다. `ChatMessage.offerStatus`는 생성 시점에 `PENDING`으로 대입되고, 응답 DTO(`ChatMessageResponse`)에도 `messageType`/`offerStatus`가 노출된다.
 
+**이 시점에 `Orders`도 함께 생성된다**: `ChatRoomService.createOffer` → `OrdersService.createNegotiationOrder(itemId, buyerId, offeredPrice)`가 호출되어 `REQUESTED` 상태의 주문이 즉시 만들어진다(이미 같은 buyer/item 조합의 `REQUESTED` 주문이 있으면 가격만 갱신). 즉 주문 생성은 "수락" 시점이 아니라 "제안" 시점이다 — 자세한 상태전이는 [`docs/api/orders.md`](orders.md) 참고.
+
 **거절**과 **수락** 모두 구현되어 있다. 상세는 아래 섹션 참고.
 
 ### POST /api/chat/rooms/{roomId}/offer/{messageId}/reject (가격 제안 거절)
@@ -31,9 +33,10 @@
 - **권한**: `chatRoom.getItem().getSeller()`가 로그인 사용자와 일치해야 한다(판매자만 거절 가능). 불일치 시 `UnauthorizedException`(401)을 던진다 — 의미상 403(`ChatRoomException(HttpStatus.FORBIDDEN, ...)`)이 더 적합하지만 현재 구현은 401로 응답한다는 점에 유의.
 - **검증**: `messageId`로 `ChatMessage` 조회 실패 시에만 `ChatMessageException`(400)을 던진다. **`messageId`가 실제로 해당 `roomId` 소속인지, `messageType`이 `OFFER`인지, `offerStatus`가 `PENDING`인지는 검증하지 않는다** — 알려진 제약이며 후속 개선 과제로 남아 있다(`docs/chat-review.md` 참고).
 - **처리**: 원본 `ChatMessage`의 `offerStatus`만 바꾸는 것이 아니라, `"거절합니다."` 내용의 **새 `ChatMessage` 레코드**를 추가로 저장한다(`ChatMessage.rejectOfferMessage(...)`). 원본 메시지도 `changeStatusToReject()`로 `offerStatus = REJECTED`가 되지만, 응답/브로드캐스트에 담기는 메시지는 이 새 레코드다.
+- ⚠️ **`Orders`는 건드리지 않는다**: 제안 생성 시점에 만들어진 `REQUESTED` 주문(위 `POST .../offer` 섹션 참고)이 거절 후에도 그대로 남는다 — `Orders.orderStatus`를 `REJECTED`로 함께 전이시키는 처리가 없다(알려진 이슈, [`docs/orders-review.md`](../orders-review.md) 참고).
 - **응답**: `ChatRoomAndMessageDto`(`{room, message}`), HTTP **201 CREATED**.
 - **실시간 동기화**: 처리 후 컨트롤러에서 `messagingTemplate.convertAndSend("/topic/chat/rooms/"+roomId, response)`로 브로드캐스트(`createOffer`와 동일 패턴).
-- **프론트 연동**: `frontend/src/api/client.js`의 `rejectOffer(roomId, messageId)`(`POST`, 바디 없음)를 통해 `frontend/src/pages/ChatRoom.jsx`의 `handleRejectOffer`가 호출한다. 과거 STOMP `publish("/app/chat/rooms/{roomId}/offers/{messageId}/reject")` 방식(`docs/ORDER_LIFECYCLE_GUIDE.md` 8절 설계)은 폐기되었다.
+- **프론트 연동**: `frontend/src/api/client.js`의 `rejectOffer(roomId, messageId)`(`POST`, 바디 없음)를 통해 `frontend/src/pages/ChatRoom.jsx`의 `handleRejectOffer`가 호출한다. 과거 설계 단계에서 검토했던 STOMP `publish("/app/chat/rooms/{roomId}/offers/{messageId}/reject")` 방식은 폐기되고 REST로 대체되었다.
 
 ### POST /api/chat/rooms/{roomId}/offer/{messageId}/accept (가격 제안 수락)
 
@@ -50,5 +53,5 @@
 - **응답**: `ChatRoomAndMessageDto`(`{room, message}`), HTTP **201 CREATED**. `message.orderId`에 위 2번에서 생성된 주문의 id가 실린다(reject/일반 메시지 응답에서는 `orderId`가 `null`).
 - **실시간 동기화**: 처리 후 `/topic/chat/rooms/{roomId}`로 브로드캐스트(reject/createOffer와 동일 패턴).
 
-⚠️ **알려진 제약**: `Orders`에 `agreedPrice`가 저장되지만, `GET /api/orders/purchases`/`GET /api/orders/sales`(파라미터 없이 호출 시)는 `orderStatus.in(COMPLETED, PAY_COMPLETED)`로 필터링되어 있어 `ACCEPTED` 상태인 오퍼 수락 주문은 기본 목록에 나타나지 않는다 — 판매자가 `GET /api/orders/sales?status=ACCEPTED`로 명시적으로 필터링해야 보인다(상세는 [`docs/orders-review.md`](../orders-review.md) 참고).
+`Orders`에 저장된 `agreedPrice`는 `GET /api/orders/sales?status=ACCEPTED`로 조회해야 오퍼 수락 주문이 보인다 — 프론트(`SalesHistory.jsx`/`PurchaseHistory.jsx`)는 탭마다 이미 해당 `status`를 명시적으로 지정해서 호출한다(상세는 [`docs/orders-review.md`](../orders-review.md) "해결됨" 섹션 참고).
 </content>

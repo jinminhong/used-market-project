@@ -12,11 +12,10 @@
 
 ## 남은 이슈
 
-### 1. PATCH/DELETE 권한 오류의 HTTP 상태 코드가 문서와 다르고, 의미상으로도 틀렸다
+### 1. DELETE 권한 오류의 HTTP 상태 코드가 문서와 다르고, 의미상으로도 틀렸다
 
-- `ItemService.update`가 소유자가 아니면 `ItemException`을 던지는데 이는 무조건 404로 매핑된다. 문서(403 forbidden)와 실제(404)가 다르다.
-- `ItemService.delete`가 소유자가 아니면 `UnauthorizedException`(원래 "로그인 안 됨"을 뜻하는 예외)을 재사용해 401로 나간다. 역시 문서(403)와 다르다.
-- 두 엔드포인트 모두 소유자 검증 로직 자체는 존재하지만, 401/403/404 의미가 뒤섞여 프론트가 신뢰성 있게 구분할 수 없다.
+- (해결됨) `ItemException`이 `HttpStatus` 필드를 갖도록 리팩터링되어, `ItemService.update`는 이제 소유자가 아니면 `ItemException(HttpStatus.FORBIDDEN, ...)`을 던지고 `GlobalExceptionHandler`도 `e.getHttpStatus()`로 응답한다 — PATCH는 문서(403)와 실제가 일치함([`docs/orders-review.md`](orders-review.md) "해결됨" 섹션과 동일 작업).
+- `ItemService.delete`는 여전히 소유자가 아니면 `UnauthorizedException`(원래 "로그인 안 됨"을 뜻하는 예외)을 재사용해 401로 나간다. 문서(403)와 다르며, DELETE만 남은 이슈.
 
 ### 2. 상품 저장/수정 시 이미지 파일이 등록되지만 클린업이 전혀 없다
 
@@ -49,7 +48,7 @@
 
 1. **`FileStore`에 `deleteFile(String storedFilename)` 추가하고, `update`의 `deletedFileIds` 처리와 `delete`에서 실제 파일 삭제까지 연결** — 계속 누적되는 디스크 누수 문제라 우선순위가 가장 높다.
 2. **상품 삭제 전 `WishList`/`ChatRoom`/`Orders` 참조 존재 여부 확인 정책 결정** — 삭제 차단(409)할지 연관 레코드까지 정리할지 정하고, 최소한 `DataIntegrityViolationException` 핸들러부터 추가.
-3. **PATCH/DELETE의 권한 오류를 전용 403 예외로 분리** — `orders.md`의 "PATCH에서 status 필드 제거" 작업과 함께 처리하면 효율적.
+3. **DELETE의 권한 오류를 `ItemException(FORBIDDEN)`으로 교체** — PATCH는 이미 고쳐졌으니(위 1번) `ItemService.delete`의 `UnauthorizedException` 재사용만 정리하면 됨.
 4. **업로드 파일 확장자/MIME 화이트리스트 추가**(jpg/jpeg/png/webp 등) — 저장형 XSS 가능성 제거.
 5. **`ItemController`의 `@RequestPart` DTO에 `@Valid` 적용** — 이미 DTO에 붙은 애너테이션을 동작시키는 것뿐이라 비용 대비 효과가 크다. `MethodArgumentNotValidException` 핸들러는 이미 있어 추가 인프라 불필요.
 6. (우선순위 낮음) `keyword` 검색의 `LIKE '%...%'` 양쪽 와일드카드는 인덱스를 타지 못한다 — 데이터 규모가 커지면 풀텍스트 검색 도입 검토.
