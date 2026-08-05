@@ -11,7 +11,7 @@ import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
 const PAGE_SIZE = 10;
 const TAB_STATUSES = {
   pending: ["REQUESTED"],
-  agreed: ["ACCEPTED"],
+  agreed: ["RESERVED"],
   completed: ["PAY_COMPLETED", "SHIPPING", "COMPLETED"],
 };
 
@@ -163,7 +163,7 @@ export default function PurchaseHistory() {
                 {order.orderStatus === "REQUESTED" && (
                   <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "구매 요청을 취소했습니다.")}>취소</Button>
                 )}
-                {order.orderStatus === "ACCEPTED" && (
+                {order.orderStatus === "RESERVED" && (
                   <>
                     <Button size="sm" disabled={loading} onClick={() => goToOrderCheckout(order)}>구매하기</Button>
                     <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 취소했습니다.")}>취소</Button>
