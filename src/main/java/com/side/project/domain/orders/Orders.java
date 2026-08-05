@@ -3,9 +3,11 @@ package com.side.project.domain.orders;
 import com.side.project.domain.BaseEntity;
 import com.side.project.domain.item.Item;
 import com.side.project.domain.member.Member;
+import com.side.project.web.exception.orders.OrdersException;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.springframework.http.HttpStatus;
 
 import static jakarta.persistence.FetchType.*;
 
@@ -58,5 +60,13 @@ public class Orders extends BaseEntity {
 
     public void updateOrderStatus(OrderStatus orderStatus) {
         this.orderStatus = orderStatus;
+    }
+
+    public void cancelExpireReservation() {
+        if (orderStatus != OrderStatus.RESERVED) {
+            throw new OrdersException(HttpStatus.FORBIDDEN,"예약 상태의 주문만 자동 취소");
+        }
+        this.orderStatus = OrderStatus.CANCELED;
+        this.item.reopenSelling();
     }
 }

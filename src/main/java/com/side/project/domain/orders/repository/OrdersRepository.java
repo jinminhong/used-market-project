@@ -9,19 +9,28 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
-public interface OrdersRepository extends JpaRepository<Orders, Long> , OrdersRepositoryCustom {
+public interface OrdersRepository extends JpaRepository<Orders, Long>, OrdersRepositoryCustom {
 
     Optional<Orders> findByBuyerAndItemAndOrderStatus(Member buyer, Item item, OrderStatus orderStatus);
 
     @Modifying(flushAutomatically = true)
     @Query(value = """
-        UPDATE orders
-        SET order_status = 'REJECTED'
-        WHERE order_status = 'REQUESTED'
-          AND item_id = :itemId
-          AND orders_id <> :acceptedOrderId
-        """, nativeQuery = true)
+            UPDATE orders
+            SET order_status = 'REJECTED'
+            WHERE order_status = 'REQUESTED'
+              AND item_id = :itemId
+              AND orders_id <> :acceptedOrderId
+            """, nativeQuery = true)
     int rejectOtherOrders(@Param("itemId") Long itemId, @Param("acceptedOrderId") Long acceptedOrderId);
+
+    @Query("""
+            select o from Orders o join fetch o.item i
+            where o.orderStatus = :orderStatus and o.lastModifiedDate <= :expiredDate
+            """)
+    List<Orders> findExpireReservedOrders(@Param("orderStatus") OrderStatus orderStatus,
+                                          @Param("expiredDate") LocalDateTime expiredDate);
 }
