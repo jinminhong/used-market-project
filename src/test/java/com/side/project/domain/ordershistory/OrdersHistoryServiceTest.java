@@ -56,7 +56,7 @@ class OrdersHistoryServiceTest {
         itemRepository.save(item);
 
         Orders orders = new Orders();
-        orders.createOrders(buyer, item, OrderStatus.ACCEPTED, 10000);
+        orders.createOrders(buyer, item, OrderStatus.RESERVED, 10000);
         ordersRepository.save(orders);
 
         ordersHistoryService.save(orders);
@@ -65,6 +65,6 @@ class OrdersHistoryServiceTest {
                 .filter(h -> h.getOrders().getId().equals(orders.getId()))
                 .toList();
         assertThat(histories).hasSize(1);
-        assertThat(histories.get(0).getStatus()).isEqualTo(OrderStatus.ACCEPTED);
+        assertThat(histories.get(0).getStatus()).isEqualTo(OrderStatus.RESERVED);
     }
 }

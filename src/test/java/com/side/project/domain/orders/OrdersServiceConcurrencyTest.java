@@ -169,7 +169,7 @@ class OrdersServiceConcurrencyTest {
         executor.shutdown();
 
         long acceptedCount = ordersRepository.findAllById(List.of(order1.getId(), order2.getId())).stream()
-                .filter(o -> o.getOrderStatus() == OrderStatus.ACCEPTED)
+                .filter(o -> o.getOrderStatus() == OrderStatus.RESERVED)
                 .count();
 
         // acceptNegotiation()은 이제 findByIdWithMemberForUpdate로 상품 행에 PESSIMISTIC_WRITE 락을 건다.

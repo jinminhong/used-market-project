@@ -152,7 +152,7 @@ class ChatRoomServiceConcurrencyTest {
         executor.shutdown();
 
         long acceptedOrderCount = ordersRepository.findAllById(orderIds).stream()
-                .filter(o -> o.getOrderStatus() == OrderStatus.ACCEPTED)
+                .filter(o -> o.getOrderStatus() == OrderStatus.RESERVED)
                 .count();
         long acceptedOfferCount = chatMessageRepository.findAllById(messageIds).stream()
                 .filter(m -> m.getOfferStatus() == OfferStatus.ACCEPTED)

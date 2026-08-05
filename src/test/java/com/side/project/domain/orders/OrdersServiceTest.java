@@ -187,7 +187,7 @@ class OrdersServiceTest {
 
         Orders result = ordersService.acceptNegotiation(item.getId(), buyer.getId(), seller.getId(), 9000);
 
-        assertThat(result.getOrderStatus()).isEqualTo(OrderStatus.ACCEPTED);
+        assertThat(result.getOrderStatus()).isEqualTo(OrderStatus.RESERVED);
         assertThat(result.getAgreedPrice()).isEqualTo(9000);
         assertThat(itemRepository.findById(item.getId()).orElseThrow().getStatus()).isEqualTo(ItemStatus.RESERVED);
     }
@@ -243,7 +243,7 @@ class OrdersServiceTest {
 
         OrdersActionResponseDto result = ordersService.changeOrderStatus(orders.getId(), "ACCEPT", seller.getId());
 
-        assertThat(result.status()).isEqualTo(OrderStatus.ACCEPTED);
+        assertThat(result.status()).isEqualTo(OrderStatus.RESERVED);
         assertThat(itemRepository.findById(item.getId()).orElseThrow().getStatus()).isEqualTo(ItemStatus.RESERVED);
     }
 
@@ -252,7 +252,7 @@ class OrdersServiceTest {
         Member seller = createAndSaveMember("seller");
         Member buyer = createAndSaveMember("buyer");
         Item item = createAndSaveItem(seller, ItemStatus.RESERVED);
-        Orders orders = createAndSaveOrders(buyer, item, OrderStatus.ACCEPTED, 10000);
+        Orders orders = createAndSaveOrders(buyer, item, OrderStatus.RESERVED, 10000);
 
         OrdersActionResponseDto result = ordersService.changeOrderStatus(orders.getId(), "PAY", buyer.getId());
 
@@ -289,7 +289,7 @@ class OrdersServiceTest {
         Member seller = createAndSaveMember("seller");
         Member buyer = createAndSaveMember("buyer");
         Item item = createAndSaveItem(seller, ItemStatus.RESERVED);
-        Orders orders = createAndSaveOrders(buyer, item, OrderStatus.ACCEPTED, 10000);
+        Orders orders = createAndSaveOrders(buyer, item, OrderStatus.RESERVED, 10000);
 
         OrdersActionResponseDto result = ordersService.changeOrderStatus(orders.getId(), "CANCEL", buyer.getId());
 

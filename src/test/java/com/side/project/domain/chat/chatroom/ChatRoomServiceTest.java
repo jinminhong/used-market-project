@@ -262,7 +262,7 @@ class ChatRoomServiceTest {
 
         assertThat(result.message().offerStatus()).isEqualTo(OfferStatus.ACCEPTED);
         Orders order = ordersRepository.findById(result.message().orderId()).orElseThrow();
-        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.ACCEPTED);
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.RESERVED);
         assertThat(itemRepository.findById(item.getId()).orElseThrow().getStatus()).isEqualTo(ItemStatus.RESERVED);
     }
 
