@@ -112,4 +112,8 @@ public class Item {
     public void changeStatus(ItemStatus itemStatus){
         this.status = itemStatus;
     }
+
+    public void reopenSelling() {
+        this.status = ItemStatus.SELLING;
+    }
 }
