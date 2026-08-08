@@ -1,6 +1,8 @@
 package com.side.project.domain.item;
 
+import com.side.project.domain.activitylog.ActivityType;
 import com.side.project.domain.item.itemdto.*;
+import com.side.project.web.aop.LogUserActivity;
 import com.side.project.domain.item.repository.ItemRepository;
 import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.itemimage.ItemImageRepository;
@@ -69,6 +71,7 @@ public class ItemService {
         return itemRepository.findByIdWithMember(itemId);
     }
 
+    @LogUserActivity(type = ActivityType.ITEM_VIEW, itemIdExpr = "#itemId")
     public ItemDto findByIdToDto(Long itemId) {
          return findByIdWithMember(itemId).map(ItemDto::new).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
     }

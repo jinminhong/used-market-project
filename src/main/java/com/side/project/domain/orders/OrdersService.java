@@ -1,5 +1,6 @@
 package com.side.project.domain.orders;
 
+import com.side.project.domain.activitylog.ActivityType;
 import com.side.project.domain.item.Item;
 import com.side.project.domain.item.repository.ItemRepository;
 import com.side.project.domain.member.Member;
@@ -14,6 +15,7 @@ import com.side.project.domain.ordershistory.OrdersHistoryService;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.exception.orders.OrdersException;
+import com.side.project.web.aop.LogUserActivity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +39,7 @@ public class OrdersService {
     private final OrdersHistoryService ordersHistoryService;
 
     @Transactional
+    @LogUserActivity(type = ActivityType.ORDER_CREATE, itemIdExpr = "#itemId", memberIdExpr = "#buyerId")
     public Orders save(Long itemId, Long buyerId ,OrderStatus orderStatus) {
         Item item = itemRepository.findByIdWithMemberForUpdate(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
         if (!item.getStatus().equals(SELLING)) {
@@ -151,6 +154,7 @@ public class OrdersService {
     }
 
     @Transactional
+    @LogUserActivity(typeExpr = "#action", itemIdExpr = "#result.itemId()", memberIdExpr = "#requesterId")
     public OrdersActionResponseDto changeOrderStatus(Long orderId, String action, Long requesterId) {
         Orders orders = ordersRepository.findById(orderId)
                 .orElseThrow(() -> new OrdersException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));

@@ -1,5 +1,6 @@
 package com.side.project.domain.wishlist;
 
+import com.side.project.domain.activitylog.ActivityType;
 import com.side.project.domain.item.Item;
 import com.side.project.domain.item.repository.ItemRepository;
 import com.side.project.domain.member.Member;
@@ -11,6 +12,7 @@ import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.exception.wishlist.WishListException;
 import com.side.project.web.exception.wishlist.WishListNotFoundException;
+import com.side.project.web.aop.LogUserActivity;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -36,6 +38,7 @@ public class WishListService {
     }
 
     @Transactional
+    @LogUserActivity(type = ActivityType.WISHLIST_ADD, itemIdExpr = "#itemId", memberIdExpr = "#memberId")
     public void addWishList(Long itemId , Long memberId) {
         if (existWishList(itemId, memberId)) throw new WishListException("이미 찜한 상품입니다.");
         Item item = itemRepository.findById(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."));
@@ -48,6 +51,7 @@ public class WishListService {
     }
 
     @Transactional
+    @LogUserActivity(type = ActivityType.WISHLIST_DELETE, itemIdExpr = "#itemId", memberIdExpr = "#memberId")
     public void deleteWishList(Long itemId, Long memberId) {
         WishList wishList = wishListRepository.findWishListByItemIdAndMemberId(itemId, memberId).orElseThrow(() -> new WishListNotFoundException("찜한 상품을 찾을 수 없습니다."));
         wishListRepository.delete(wishList);
