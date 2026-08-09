@@ -7,6 +7,7 @@ import com.side.project.web.exception.login.LoginFailException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -24,9 +25,12 @@ class LoginServiceTest {
     @Autowired
     private MemberRepository memberRepository;
 
-    private Member createAndSaveMember(String password) {
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    private Member createAndSaveMember(String rawPassword) {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        Member member = new Member("loginId" + suffix, "홍길동", password, "nickname" + suffix,
+        Member member = new Member("loginId" + suffix, "홍길동", passwordEncoder.encode(rawPassword), "nickname" + suffix,
                 new Address("12345", "서울시", "서울시 지번", "101호"));
         return memberRepository.save(member);
     }

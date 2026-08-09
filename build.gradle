@@ -42,6 +42,14 @@ dependencies {
 	annotationProcessor "jakarta.annotation:jakarta.annotation-api"
 	annotationProcessor "jakarta.persistence:jakarta.persistence-api"
 
+	// JWT
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+	// 비밀번호 해싱 (BCrypt) - Spring Security 전체 미도입, 순수 crypto 유틸만 사용
+	implementation 'org.springframework.security:spring-security-crypto'
+
 }
 
 tasks.named('test') {

@@ -1,7 +1,10 @@
 package com.side.project.web.exception.member;
 
-public class DuplicateMemberException extends RuntimeException{
-    public DuplicateMemberException(String message) {
-        super(message);
+import com.side.project.web.exception.ApplicationException;
+import com.side.project.web.exception.ErrorCode;
+
+public class DuplicateMemberException extends ApplicationException {
+    public DuplicateMemberException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
     }
 }

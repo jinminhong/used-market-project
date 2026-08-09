@@ -9,8 +9,9 @@
 - **운송장(배송) 관리** — `Orders.trackingCompany`/`trackingNumber` 필드와 `PATCH /api/orders/{orderId}/tracking`이 구현되어, 판매자가 발송 후 운송장 정보를 등록할 수 있다.
 - **상태변경 감사로그** — `domain/ordershistory`(`OrdersHistory` + `OrdersHistoryService.save`)가 상태가 바뀔 때마다 스냅샷을 append한다.
 - **목록 조회 기본 필터 수정 완료** — `PurchaseHistory.jsx`가 탭마다 `TAB_STATUSES`(`REQUESTED`/`ACCEPTED`/`PAY_COMPLETED,SHIPPING,COMPLETED`)로 `status`를 항상 명시적으로 전달하도록 바뀌어, "구매완료" 탭에 취소·거절된 주문까지 섞여 보이던 문제가 해결됨.
-- **`ItemException`이 `HttpStatus` 필드를 갖도록 리팩터링 완료** — `OrdersException`/`ChatRoomException`과 동일하게 생성자에서 `HttpStatus`를 받고 `GlobalExceptionHandler.itemException`이 `e.getHttpStatus()`로 응답하도록 바뀌었으며, `OrdersService`/`ItemService.update` 등 호출부도 404/409/403을 상황에 맞게 던지도록 갱신됨.
+- **`ItemException`이 `ErrorCode`를 갖도록 리팩터링 완료** — `OrdersException`/`ChatRoomException`과 동일하게 공통 부모 `ApplicationException`이 생성자에서 `ErrorCode`를 받고, `GlobalExceptionHandler.applicationException`이 `e.getErrorCode().getStatus()`로 응답하도록 바뀌었으며, `OrdersService`/`ItemService.update` 등 호출부도 404/409/403을 상황에 맞게 던지도록 갱신됨.
 - **락 타임아웃 예외 매핑 추가 완료** — `GlobalExceptionHandler`에 `PessimisticLockingFailureException` 핸들러가 추가되어 409로 응답한다. Hibernate가 던지는 `PessimisticLockException`/`LockTimeoutException`은 Spring이 이 예외로 변환해 전달하므로 함께 커버됨.
+- **에러 응답이 `{error, message}` JSON 포맷으로 전환 완료** — `GlobalExceptionHandler`가 `ErrorResponse(error, message)`를 반환하도록 전 도메인이 함께 리팩터링됐다.
 
 ## 남은 이슈
 

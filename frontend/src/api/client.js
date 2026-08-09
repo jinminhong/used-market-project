@@ -1,5 +1,28 @@
 import { sampleItems } from "./constants.js";
 import { defaultImage } from "./normalize.js";
+import { tokenStore } from "./tokenStore.js";
+
+let refreshPromise = null;
+
+async function tryRefresh() {
+  if (!refreshPromise) {
+    refreshPromise = fetch("/api/token/refresh", { method: "POST", credentials: "include" })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => {
+        tokenStore.set(data.accessToken);
+        return true;
+      })
+      .catch(() => {
+        tokenStore.set(null);
+        tokenStore.notifyExpired();
+        return false;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
 
 function appendStatusParams(params, status) {
   if (!status) return;
@@ -49,7 +72,7 @@ export function createApi(useMock) {
   let mockOrders = useMock ? buildSeedOrders(mockItems) : [];
   let mockWishlist = [];
 
-  async function request(path, options = {}) {
+  async function request(path, options = {}, _retried = false) {
     const method = options.method || "GET";
     const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
     const body = options.body && !isFormData ? JSON.parse(options.body) : null;
@@ -57,13 +80,27 @@ export function createApi(useMock) {
     if (useMock) return mockRequest(path, method, body);
 
     const { headers: optionHeaders, ...fetchOptions } = options;
-    const headers = isFormData ? optionHeaders : { "Content-Type": "application/json", ...optionHeaders };
+    const authHeader = tokenStore.get() ? { Authorization: `Bearer ${tokenStore.get()}` } : {};
+    const headers = isFormData
+      ? { ...authHeader, ...optionHeaders }
+      : { "Content-Type": "application/json", ...authHeader, ...optionHeaders };
     const response = await fetch(`/api${path}`, {
       credentials: "include",
       ...fetchOptions,
       headers,
     });
-    if (!response.ok) throw new Error((await response.text()) || `요청 실패 (${response.status})`);
+
+    if (response.status === 401 && !_retried && path !== "/login" && path !== "/token/refresh") {
+      const refreshed = await tryRefresh();
+      if (refreshed) return request(path, options, true);
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      let message = text || `요청 실패 (${response.status})`;
+      try { message = JSON.parse(text).message ?? message; } catch { /* JSON이 아니면 원문 텍스트 유지 */ }
+      throw new Error(message);
+    }
     if (response.status === 204) return null;
     const text = await response.text();
     if (!text) return null;

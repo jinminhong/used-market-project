@@ -1,15 +1,5 @@
 package com.side.project.web.exception;
 
-import com.side.project.web.exception.chat.message.ChatMessageException;
-import com.side.project.web.exception.chat.room.ChatRoomException;
-import com.side.project.web.exception.item.ItemException;
-import com.side.project.web.exception.login.LoginFailException;
-import com.side.project.web.exception.login.UnauthorizedException;
-import com.side.project.web.exception.member.DuplicateMemberException;
-import com.side.project.web.exception.member.MemberException;
-import com.side.project.web.exception.orders.OrdersException;
-import com.side.project.web.exception.wishlist.WishListException;
-import com.side.project.web.exception.wishlist.WishListNotFoundException;
 import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,71 +7,29 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
-
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(DuplicateMemberException.class)
-    public ResponseEntity duplicateMemberException(DuplicateMemberException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-    }
 
-    @ExceptionHandler(MemberException.class)
-    public ResponseEntity memberException(MemberException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-    }
-
-    @ExceptionHandler(ItemException.class)
-    public ResponseEntity itemException(ItemException e) {
-        return ResponseEntity.status(e.getHttpStatus()).body(e.getMessage());
-    }
-
-    @ExceptionHandler(LoginFailException.class)
-    public ResponseEntity loginFailException(LoginFailException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
-    }
-
-    @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity requiredLoginException(UnauthorizedException e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
-    }
-
-    @ExceptionHandler(WishListException.class)
-    public ResponseEntity wishListException(WishListException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
-    }
-
-    @ExceptionHandler(WishListNotFoundException.class)
-    public ResponseEntity wishListNotFoundException(WishListNotFoundException e) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-    }
-
-    @ExceptionHandler(ChatRoomException.class)
-    public ResponseEntity chatRoomException(ChatRoomException e) {
-        return ResponseEntity.status(e.getHttpStatus()).body(e.getMessage());
-    }
-
-    @ExceptionHandler(ChatMessageException.class)
-    public ResponseEntity chatMessageException(ChatMessageException e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-    }
-
-    @ExceptionHandler(OrdersException.class)
-    public ResponseEntity ordersException(OrdersException e) {
-        return ResponseEntity.status(e.getHttpStatus()).body(e.getMessage());
+    @ExceptionHandler(ApplicationException.class)
+    public ResponseEntity<ErrorResponse> applicationException(ApplicationException e) {
+        ErrorCode errorCode = e.getErrorCode();
+        return ResponseEntity.status(errorCode.getStatus())
+                .body(new ErrorResponse(errorCode.getCode(), e.getMessage()));
     }
 
     @ExceptionHandler(PessimisticLockingFailureException.class)
-    public ResponseEntity pessimisticLockingFailureException(PessimisticLockingFailureException e) {
-        return ResponseEntity.status(HttpStatus.CONFLICT).body("다른 사용자가 처리 중인 상품입니다. 잠시 후 다시 시도해주세요.");
+    public ResponseEntity<ErrorResponse> pessimisticLockingFailureException(PessimisticLockingFailureException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(ErrorCode.CONFLICT_STATE.getCode(), "다른 사용자가 처리 중인 상품입니다. 잠시 후 다시 시도해주세요."));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity methodArgumentNotValidException(MethodArgumentNotValidException e) {
+    public ResponseEntity<ErrorResponse> methodArgumentNotValidException(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .reduce((a, b) -> a + ", " + b)
                 .orElse(e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(message);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse(ErrorCode.INVALID_REQUEST.getCode(), message));
     }
 }

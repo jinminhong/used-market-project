@@ -1,16 +1,10 @@
 package com.side.project.web.exception.item;
 
-import org.springframework.http.HttpStatus;
+import com.side.project.web.exception.ApplicationException;
+import com.side.project.web.exception.ErrorCode;
 
-public class ItemException extends RuntimeException {
-    private final HttpStatus httpStatus;
-
-    public ItemException(HttpStatus httpStatus, String message) {
-        super(message);
-        this.httpStatus = httpStatus;
-    }
-
-    public HttpStatus getHttpStatus() {
-        return httpStatus;
+public class ItemException extends ApplicationException {
+    public ItemException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
     }
 }

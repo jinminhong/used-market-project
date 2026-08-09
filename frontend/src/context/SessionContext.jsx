@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createApi } from "../api/client.js";
 import { normalizeMemberInfo } from "../api/normalize.js";
+import { tokenStore } from "../api/tokenStore.js";
 
 const NOTICE_DURATION = 3000;
 const SessionContext = createContext(null);
@@ -16,10 +17,20 @@ export function SessionProvider({ children }) {
   const initFetchedRef = useRef(false);
 
   useEffect(() => {
+    tokenStore.setOnSessionExpired(() => setMember(null));
+  }, []);
+
+  useEffect(() => {
     if (initFetchedRef.current) return; // StrictMode 개발 모드 재실행 스킵(중복 요청 방지)
     initFetchedRef.current = true;
     (async () => {
       try {
+        // 새로고침 시 메모리의 access token은 사라지지만 HttpOnly refresh 쿠키는 남아있으므로 먼저 재발급을 시도한다.
+        const refreshResponse = await fetch("/api/token/refresh", { method: "POST", credentials: "include" });
+        if (!refreshResponse.ok) throw new Error("no session");
+        const { accessToken } = await refreshResponse.json();
+        tokenStore.set(accessToken);
+
         const info = await createApi(false).getMyInfo();
         setMember(normalizeMemberInfo(info));
       } catch {
@@ -65,6 +76,7 @@ export function SessionProvider({ children }) {
         // 서버 로그아웃 실패해도 프론트 상태는 정리한다
       }
     }
+    tokenStore.set(null);
     setMember(null);
     setNotice("");
   }

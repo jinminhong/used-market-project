@@ -85,7 +85,7 @@ class ChatMessageServiceTest {
 
         assertThatThrownBy(() -> chatMessageService.sendMessage(-1L, buyer.getId(), request))
                 .isInstanceOf(ChatRoomException.class)
-                .extracting(e -> ((ChatRoomException) e).getHttpStatus())
+                .extracting(e -> ((ChatRoomException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -100,7 +100,7 @@ class ChatMessageServiceTest {
 
         assertThatThrownBy(() -> chatMessageService.sendMessage(chatRoom.getId(), other.getId(), request))
                 .isInstanceOf(ChatRoomException.class)
-                .extracting(e -> ((ChatRoomException) e).getHttpStatus())
+                .extracting(e -> ((ChatRoomException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 

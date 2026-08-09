@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { Client } from "@stomp/stompjs";
 import { useSession } from "./SessionContext.jsx";
+import { tokenStore } from "../api/tokenStore.js";
 
 const ChatSocketContext = createContext(null);
 
@@ -23,6 +24,10 @@ export function ChatSocketProvider({ children }) {
     const client = new Client({
       brokerURL: `${protocol}://${window.location.host}/ws-chat`,
       reconnectDelay: 5000,
+      // access token은 30분마다 회전되므로 (재)연결 직전마다 최신 토큰을 CONNECT 프레임에 실어 보낸다.
+      beforeConnect: () => {
+        client.connectHeaders = { Authorization: `Bearer ${tokenStore.get() ?? ""}` };
+      },
       onConnect: () => {
         setConnected(true);
         setConnectionError(null);

@@ -31,29 +31,29 @@
 | error 코드 | HTTP 상태 | 의미 |
 |---|---|---|
 | `invalid_request` | 400 | 요청 형식/파라미터가 잘못됨 (Bean Validation 실패 등) |
-| `unauthorized` | 401 | 로그인이 필요한데 세션이 없거나 로그인 실패 |
+| `unauthorized` | 401 | 로그인이 필요한데 인증 토큰이 없거나(만료/위조 포함) 로그인 실패 |
 | `forbidden` | 403 | 로그인은 했지만 이 리소스에 대한 권한 없음(예: 남의 상품 수정) |
 | `not_found_item` / `not_found_member` / `not_found_order` 등 | 404 | 대상 리소스를 찾을 수 없음 |
 | `duplicate_member` / `duplicate_nickname` / `duplicate_wishlist` 등 | 409 | 이미 존재하는 리소스와 충돌 |
 | `conflict_state` | 409 | 현재 상태에서 허용되지 않는 전이/동작 시도 (예: 이미 판매된 상품 구매, 잘못된 순서의 주문 상태전이) |
 
-**⚠️ 중요**: 이 에러 JSON 포맷은 프론트가 받고 싶은 **목표 규격**입니다. 현재 실제 `web/exception/GlobalExceptionHandler`는 이런 JSON이 아니라, 예외 메시지 문자열을 그대로 텍스트 바디로 반환합니다(`ResponseEntity.status(...).body(e.getMessage())`). 즉 "구현됨" 엔드포인트라도 에러 응답만큼은 전부 "미구현(제안)" 상태이며, 이 포맷대로 응답하려면 `GlobalExceptionHandler`와 각 도메인 예외 클래스가 함께 수정되어야 합니다. 각 파일에서는 이 사실을 반복하지 않습니다.
+이 에러 JSON 포맷은 실제로 적용되어 있습니다. `web/exception/GlobalExceptionHandler`가 도메인 예외들의 공통 부모인 `ApplicationException`(및 그 하위 `ErrorCode`)을 기준으로 `{error, message}` 바디를 생성합니다(`web/exception/ErrorCode`, `web/exception/ApplicationException`, `web/exception/ErrorResponse` 참고). Bean Validation 실패(`MethodArgumentNotValidException`)와 비관적 락 충돌(`PessimisticLockingFailureException`)도 각각 `invalid_request`/`conflict_state`로 매핑되어 나간다.
 
 ## 공통 규칙
 
 - Base URL: React에서는 `/api`. 로컬 개발 시 Vite가 `http://localhost:5173/api` → `http://localhost:8080/api`로 프록시.
-- 인증: Spring Security/JWT 없음. `HttpSession` 기반 수제 로그인(`web/login`). 세션이 필요한 요청은 `fetch`에 `credentials: "include"`가 있어야 함.
-- 인터셉터: `web/interceptor/LoginCheckInterceptor` + `web/config/WebConfig`가 `/**` 전체를 대상으로 동작(order 1).
-  - `excludePathPatterns`: `/`, `/api/login`, `/api/logout`, `/api/members`, `/api/members/check-id`, `/api/members/check-nickname`, `/api/members/*/shop`, `/css/**`, `/error`, `/api/images/**`
+- 인증: Spring Security는 없지만 JWT는 있다. `HttpSession`이 아닌 Access Token(`Authorization: Bearer ...`) + Refresh Token(HttpOnly 쿠키) 기반 수제 인증(`web/login`, `web/jwt`, `domain/auth`). 인증이 필요한 요청은 `fetch`에 `Authorization` 헤더(Access Token)와 `credentials: "include"`(Refresh 쿠키 동봉용)가 모두 필요.
+- 인터셉터: `web/interceptor/LoginCheckInterceptor` + `web/config/WebConfig`가 `/**` 전체를 대상으로 동작(order 1). Authorization 헤더의 JWT를 검증해 통과 여부를 결정한다(세션 아님).
+  - `excludePathPatterns`: `/`, `/api/login`, `/api/logout`, `/api/token/refresh`, `/api/members`, `/api/members/check-id`, `/api/members/check-nickname`, `/api/members/*/shop`, `/css/**`, `/error`, `/api/images/**`
   - 추가 하드코딩 규칙: **HTTP method가 GET이고 요청 URI가 `/api/items` 또는 `/api/items/**`에 매치하면** 로그인 없이 통과(`AntPathMatcher` 기반, `excludePathPatterns`가 아니라 인터셉터 내부 코드로 처리됨).
-- 세션: 타임아웃 `server.servlet.session.timeout=7d`(`application.properties`). 로그아웃은 `POST /api/logout`이 세션을 무효화한다.
+- 토큰: Access Token 유효기간 30분, Refresh Token 14일(DB 저장, rotation + 재사용 탐지). 자세한 설정 키/발급 흐름은 [auth.md](./auth.md) 참고. 로그아웃은 `POST /api/logout`이 Refresh Token을 무효화한다.
 - 페이징 응답 패턴: 목록 API는 대부분 `{"list": [...], "hasNext": boolean}` 형태(Slice 방식, `total`/`totalPages` 없음).
 
 ## 도메인별 문서
 
 | 파일 | URL 분기 | 상태 |
 |---|---|---|
-| [auth.md](./auth.md) | `/api/login`, `/api/logout` | 구현됨 |
+| [auth.md](./auth.md) | `/api/login`, `/api/logout`, `/api/token/refresh` | 구현됨 |
 | [members.md](./members.md) | `/api/members/**` | 구현됨 |
 | [items.md](./items.md) | `/api/items/**` | 구현됨 |
 | [images.md](./images.md) | `/api/images/**` | 구현됨 |

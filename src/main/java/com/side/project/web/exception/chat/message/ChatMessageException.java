@@ -1,7 +1,10 @@
 package com.side.project.web.exception.chat.message;
 
-public class ChatMessageException extends RuntimeException {
+import com.side.project.web.exception.ApplicationException;
+import com.side.project.web.exception.ErrorCode;
+
+public class ChatMessageException extends ApplicationException {
     public ChatMessageException(String message) {
-        super(message);
+        super(ErrorCode.INVALID_REQUEST, message);
     }
 }

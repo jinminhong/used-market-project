@@ -79,7 +79,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.save(-1L, buyer.getId(), OrderStatus.PAY_COMPLETED))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -91,7 +91,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.save(item.getId(), buyer.getId(), OrderStatus.PAY_COMPLETED))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
@@ -102,7 +102,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.save(item.getId(), seller.getId(), OrderStatus.PAY_COMPLETED))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
@@ -160,7 +160,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.rejectNegotiation(item.getId(), buyer.getId(), seller.getId()))
                 .isInstanceOf(OrdersException.class)
-                .extracting(e -> ((OrdersException) e).getHttpStatus())
+                .extracting(e -> ((OrdersException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -174,7 +174,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.rejectNegotiation(item.getId(), buyer.getId(), other.getId()))
                 .isInstanceOf(OrdersException.class)
-                .extracting(e -> ((OrdersException) e).getHttpStatus())
+                .extracting(e -> ((OrdersException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
@@ -215,7 +215,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.registerTracking(-1L, seller.getId(), trackingUpdateDto))
                 .isInstanceOf(OrdersException.class)
-                .extracting(e -> ((OrdersException) e).getHttpStatus())
+                .extracting(e -> ((OrdersException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -230,7 +230,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.registerTracking(orders.getId(), other.getId(), trackingUpdateDto))
                 .isInstanceOf(OrdersException.class)
-                .extracting(e -> ((OrdersException) e).getHttpStatus())
+                .extracting(e -> ((OrdersException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
@@ -306,7 +306,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.changeOrderStatus(orders.getId(), "PAY", buyer.getId()))
                 .isInstanceOf(OrdersException.class)
-                .extracting(e -> ((OrdersException) e).getHttpStatus())
+                .extracting(e -> ((OrdersException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
@@ -319,7 +319,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.changeOrderStatus(orders.getId(), "ACCEPT", buyer.getId()))
                 .isInstanceOf(OrdersException.class)
-                .extracting(e -> ((OrdersException) e).getHttpStatus())
+                .extracting(e -> ((OrdersException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
@@ -332,7 +332,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.changeOrderStatus(orders.getId(), "UNKNOWN", seller.getId()))
                 .isInstanceOf(OrdersException.class)
-                .extracting(e -> ((OrdersException) e).getHttpStatus())
+                .extracting(e -> ((OrdersException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
@@ -345,7 +345,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.changeOrderStatus(orders.getId(), "CANCEL", buyer.getId()))
                 .isInstanceOf(OrdersException.class)
-                .extracting(e -> ((OrdersException) e).getHttpStatus())
+                .extracting(e -> ((OrdersException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
@@ -359,7 +359,7 @@ class OrdersServiceTest {
 
         assertThatThrownBy(() -> ordersService.changeOrderStatus(orders.getId(), "ACCEPT", other.getId()))
                 .isInstanceOf(OrdersException.class)
-                .extracting(e -> ((OrdersException) e).getHttpStatus())
+                .extracting(e -> ((OrdersException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 }

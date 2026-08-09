@@ -1,7 +1,10 @@
 package com.side.project.web.exception.wishlist;
 
-public class WishListException extends RuntimeException {
+import com.side.project.web.exception.ApplicationException;
+import com.side.project.web.exception.ErrorCode;
+
+public class WishListException extends ApplicationException {
     public WishListException(String message) {
-        super(message);
+        super(ErrorCode.CONFLICT_STATE, message);
     }
 }

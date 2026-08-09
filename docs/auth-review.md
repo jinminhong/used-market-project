@@ -1,56 +1,42 @@
 # Auth(로그인) 백엔드 리뷰
 
-`web/login/**`, `web/argumentresolver/**`, `web/interceptor/LoginCheckInterceptor`, `web/config/WebConfig`를 대상으로 한 코드 리뷰 기록. 코드를 직접 읽고 확인한 내용만 담았으며, `docs/api/auth.md`/`docs/api/README.md`에 적힌 기존 "알려진 이슈"가 현재도 유효한지 재검증했다. 엔드포인트 계약 자체는 [`docs/api/auth.md`](api/auth.md)가 기준 문서다.
+`web/login/**`, `web/jwt/**`, `domain/auth/**`, `web/argumentresolver/**`, `web/interceptor/**`, `web/config/WebConfig`, `web/config/WebSocketConfig`를 대상으로 한 코드 리뷰 기록. 코드를 직접 읽고 확인한 내용만 담았다. 엔드포인트 계약 자체는 [`docs/api/auth.md`](api/auth.md)가 기준 문서다.
 
-## 해결됨 (문서/기존 서술과 실제 코드가 달랐던 부분)
+세션 기반 인증 → JWT(Access + Refresh Token) 기반, 비밀번호 평문 저장/비교 → BCrypt 해싱으로 전환하는 작업이 완료되어, 아래는 그 이후 상태를 기준으로 다시 정리한 것이다.
 
-- **`LoginCheckInterceptor`의 `/api/items` 예외가 이미 `AntPathMatcher` 기반으로 정확히 매칭됨** — `LoginCheckInterceptor.java:18,26-29`가 `PATH_MATCHER.match("/api/items", requestURI)` / `match("/api/items/**", requestURI)`를 사용한다. `CLAUDE.md`에 남아있는 "`startsWith` 하드코딩, 과거에는 `contains`였음"이라는 서술은 더 이상 코드와 일치하지 않는다. `/api/itemsFoo` 같은 무관한 경로가 오탐으로 뚫리는 문제는 없다.
-- **`LoginMemberArgumentResolver`는 세션이 없거나 `LOGIN_MEMBER` 속성이 없을 때 `null`을 반환하지 않고 `UnauthorizedException`을 던진다** — `LoginMemberArgumentResolver.java:38-46`. `CLAUDE.md`의 "세션이 없으면 예외가 아니라 `null`로 해석되므로 반드시 null 체크를 해야 한다"는 서술은 현재 구현과 다르다. `@Login LoginMember`를 쓰는 모든 컨트롤러를 확인한 결과 어디에서도 null 체크를 하지 않지만 NPE 위험은 없다 — `LoginCheckInterceptor`(preHandle)와 리졸버 양쪽에서 이중으로 막고 있는 구조.
+## 해결됨
+
+- **비밀번호 평문 저장·비교** — `MemberService.join()`/`update()`가 `PasswordEncoder.encode()`(BCrypt)로 해싱 후 저장하고, `LoginService.authenticate()`는 `passwordEncoder.matches()`로 비교한다. `web/config/PasswordEncoderConfig`가 `BCryptPasswordEncoder` 빈을 등록한다.
+- **세션 고정(session fixation) 공격** — `HttpSession`을 더 이상 생성하지 않으므로 이 공격 클래스 자체가 구조적으로 사라졌다. 인증 상태는 stateless Access Token(JWT)과 서버에 저장된 Refresh Token으로 관리된다.
+- **세션 쿠키 보안 속성 미설정** — Refresh Token 쿠키는 `HttpOnly`가 항상 켜져 있고, `Secure`/`SameSite`는 `application.properties`의 `app.auth.cookie.secure`/`app.auth.cookie.same-site`로 명시적으로 관리된다(로컬은 `false`/`Lax`, 배포 시 `true`/환경에 맞게 조정 필요).
+- **`LoginMemberArgumentResolver`의 로깅 오타 및 매 요청 INFO 로그** — JWT 전환 과정에서 `supportsParameter()`의 `log.info("supprotsParameter 실행")` 라인을 제거했다.
+- **`jwt.secret`의 로컬 기본값이 코드에 커밋되어 있음** — 배포 환경에서 `JWT_SECRET`을 설정하지 않으면 알려진 로컬 기본값(`local-dev-only-secret-change-me-32bytes-minimum`)으로 서명되는 위험이 있었다. `JwtTokenProvider` 생성자에서 주입된 secret이 이 기본값과 같으면 `log.warn`으로 경고를 남기도록 했다 — 배포 시 `JWT_SECRET` 미설정을 부팅 로그에서 바로 확인할 수 있다.
+- **에러 응답이 `{error, message}` JSON 포맷이 아니었던 문제** — `GlobalExceptionHandler`가 도메인 예외들의 공통 부모 `ApplicationException`(+ `ErrorCode`)을 기준으로 `{error, message}` JSON을 반환하도록 전 도메인(`auth`/`item`/`orders`/`member`/`wishlist`/`chat`) 예외 클래스와 함께 리팩터링됐다. `docs/api/README.md`의 목표 규격이 실제로 적용된 상태다.
 
 ## 남은 이슈
 
-### 1. 비밀번호가 평문으로 저장·비교됨 (가장 심각)
+### 1. 로그인 실패에 대한 rate limiting/lockout이 전혀 없음
 
-- 저장: `Member.java:45`(생성자), `Member.java:54-55`(`updateMember`), `MemberService.java:29`(회원가입) — 어디에도 `PasswordEncoder`/해싱 로직이 없다.
-- 비교: `LoginService.java:17` — `member.getPassword().equals(loginForm.getPassword())`로 평문 문자열 비교.
-- DB(H2 파일)가 유출되거나 SQL 로그(`show-sql`)에 바인딩 파라미터가 남을 경우 비밀번호가 그대로 노출된다.
+`LoginService.authenticate()`는 실패 횟수를 세거나 계정/IP를 잠그는 로직이 없어 브루트포스에 무방비다. 도입하려면 `Member`에 실패 카운트 컬럼을 추가하거나 별도 캐시가 필요해 범위가 크다.
 
-### 2. 세션 고정(session fixation) 공격에 대한 방어가 없음
+### 2. 로그아웃 시 Access Token 즉시 무효화 불가
 
-- `LoginController.java:28-29`에서 세션을 얻고 바로 `setAttribute`만 호출한다. 로그인 성공 시점에 세션을 재발급(`changeSessionId()` 등)하는 처리가 없어, 로그인 전 세션 쿠키를 심어두는 고전적인 session fixation이 가능하다. 수정은 인증 성공 직후 `request.changeSessionId()` 한 줄로 비교적 간단하다.
+Access Token은 stateless JWT라 서버가 개별 토큰을 추적하지 않는다. 로그아웃은 Refresh Token만 무효화하므로, 이미 발급된 Access Token은 만료 시각(기본 30분, `jwt.access-token-expiration-ms`)까지 이론상 계속 유효하다. 즉시 차단이 필요하면 별도 블랙리스트(예: Redis 기반 jti 저장)가 필요하지만 현재 범위에서는 의도적으로 수용한 리스크다.
 
-### 3. 로그인 실패에 대한 rate limiting/lockout이 전혀 없음
+### 3. 만료/폐기된 Refresh Token 레코드가 DB에 계속 쌓임
 
-- `LoginService.authenticate`(`LoginService.java:15-19`)는 실패 횟수를 세거나 계정/IP를 잠그는 로직이 없어 브루트포스에 무방비다. 도입하려면 `Member`에 실패 카운트 컬럼을 추가하거나 별도 캐시가 필요해 범위가 크다.
-
-### 4. 세션 쿠키 보안 속성이 명시적으로 설정되어 있지 않음
-
-- `application.properties`에 `server.servlet.session.cookie.secure`/`http-only`/`same-site` 설정이 없다. 로컬 개발(HTTP)에서는 문제 없지만 배포(HTTPS) 전환 시 `Secure`/`SameSite` 명시가 필요하다.
-
-### 5. `LoginMemberArgumentResolver`의 로깅이 매 요청마다 시끄럽고 오타가 있음
-
-- `LoginMemberArgumentResolver.java:22`("supprotsParameter 실행" — 오타)와 `:33`이 `log.info`라서, `@Login`이 없는 요청까지 포함해 매 요청마다 INFO 로그가 쌓인다. `debug`로 낮추거나 제거 권장.
-
-### 6. 여전히 유효한 기존 이슈
-
-- `redirectUrl` 쿼리 파라미터(`LoginController.java:24`)는 받기만 하고 사용되지 않는 죽은 파라미터.
-- `GlobalExceptionHandler`의 로그인 관련 핸들러가 여전히 `e.getMessage()`를 텍스트 바디로 반환하며, `docs/api/README.md`가 요구하는 `{"error","message"}` JSON 포맷이 아니다(전 도메인 공통 이슈).
+`domain/auth/RefreshTokenService`는 rotation/로그아웃/재사용 탐지 시 `revoked_at`만 세팅할 뿐 row를 삭제하지 않는다(재사용 탐지 근거로 남겨두는 것은 의도적). 다만 만료 후 오래된 row를 정리하는 배치가 없어 `refresh_token` 테이블이 무한히 커진다. 프로젝트에 이미 `spring-boot-starter-batch-jdbc` 의존성이 있으므로, `OrdersAutoCancelScheduler`와 유사한 스케줄러/배치 잡으로 만료 row를 주기적으로 삭제하는 것을 고려할 수 있다.
 
 ## 잘 되어 있는 부분
 
 - `LoginController.login`에 `@Valid LoginForm`이 실제로 연결되어 있고, `MethodArgumentNotValidException` 핸들러와도 잘 이어져 400을 반환한다.
-- 인증 관련 예외(`LoginFailException`, `UnauthorizedException`)가 일관되게 401로 매핑된다.
-- `LoginController.logout`이 세션 유무와 무관하게 항상 204를 반환해 멱등하고 안전하다.
-- 세션 타임아웃을 7일로 늘린 이유가 주석으로 명시되어 있어 추적하기 좋다.
-- `WebConfig`의 `excludePathPatterns`가 실제 공개 엔드포인트와 정확히 대응되며 `docs/api/README.md`와도 일치한다.
-- WebSocket 핸드셰이크(`LoginHandshakeInterceptor`, [`docs/chat-review.md`](chat-review.md) 참고)도 동일한 세션 속성을 검사해 HTTP/STOMP 양쪽 인증 모델이 일관적이다.
+- 인증 관련 예외(`LoginFailException`, `JwtAuthenticationException`, `UnauthorizedException`)가 `JwtAuthenticationException extends UnauthorizedException` 상속 관계로 일관되게 401로 매핑된다.
+- `LoginController.logout`이 쿠키 유무와 무관하게 항상 204를 반환해 멱등하고 안전하다.
+- Refresh Token rotation 시 재사용 탐지(reuse detection)가 구현되어 있다 — 이미 폐기된 토큰이 다시 제출되면 해당 회원의 모든 Refresh Token을 즉시 무효화한다(`RefreshTokenService.rotate()`). 무효화 로직 자체가 예외 발생 시 트랜잭션 롤백으로 함께 취소되지 않도록 `@Transactional(noRollbackFor = JwtAuthenticationException.class)`로 명시되어 있다(구현 중 실제로 걸렸던 버그).
+- STOMP 채팅(`/ws-chat`)도 `StompAuthChannelInterceptor`로 CONNECT 프레임의 JWT를 검증해 HTTP REST와 인증 모델이 일관적이다(브라우저 네이티브 WebSocket 핸드셰이크는 커스텀 헤더를 못 실으므로 핸드셰이크가 아닌 STOMP 프레임 레벨에서 인증).
+- `WebConfig`의 `excludePathPatterns`가 실제 공개 엔드포인트(`/api/token/refresh` 포함)와 정확히 대응된다.
 
 ## 다음에 손대면 좋을 순서
 
-1. 로그인 성공 시 세션 재발급 추가(`request.changeSessionId()`) — 비용 대비 효과가 가장 큰 session fixation 방어.
-2. 비밀번호 해싱 도입 — `Member` 생성/수정과 `LoginService.authenticate` 세 지점을 `PasswordEncoder`(BCrypt 등)로 동시에 변경.
-3. 로그인 실패 rate limiting/lockout 설계 — 스키마 변경 또는 별도 캐시가 필요해 범위가 크므로 2번 다음 우선순위.
-4. 세션 쿠키 `Secure`/`SameSite` 속성 명시 — 배포(HTTPS) 전환 시점에 맞춰 추가.
-5. `GlobalExceptionHandler`를 `{error, message}` JSON 포맷으로 전환 — auth 전용이 아니라 전 도메인 공통 작업이므로 다른 도메인과 묶어 한 번에 정리.
-6. (우선순위 낮음) `LoginMemberArgumentResolver`의 로그 레벨/오타 정리, `redirectUrl` 죽은 파라미터 제거 여부 결정.
-</content>
+1. 로그인 실패 rate limiting/lockout 설계 — 스키마 변경 또는 별도 캐시가 필요해 범위가 큼.
+2. 만료된 Refresh Token 정리 배치 추가.

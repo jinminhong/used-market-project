@@ -1,16 +1,10 @@
 package com.side.project.web.exception.chat.room;
 
-import org.springframework.http.HttpStatus;
+import com.side.project.web.exception.ApplicationException;
+import com.side.project.web.exception.ErrorCode;
 
-public class ChatRoomException extends RuntimeException {
-    private final HttpStatus httpStatus;
-
-    public ChatRoomException(HttpStatus httpStatus, String message) {
-        super(message);
-        this.httpStatus = httpStatus;
-    }
-
-    public HttpStatus getHttpStatus() {
-        return httpStatus;
+public class ChatRoomException extends ApplicationException {
+    public ChatRoomException(ErrorCode errorCode, String message) {
+        super(errorCode, message);
     }
 }

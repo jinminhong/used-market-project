@@ -1,7 +1,10 @@
 package com.side.project.web.exception.login;
 
-public class LoginFailException extends RuntimeException {
+import com.side.project.web.exception.ApplicationException;
+import com.side.project.web.exception.ErrorCode;
+
+public class LoginFailException extends ApplicationException {
     public LoginFailException(String message) {
-        super(message);
+        super(ErrorCode.UNAUTHORIZED, message);
     }
 }

@@ -14,7 +14,7 @@
 
 ### 1. DELETE 권한 오류의 HTTP 상태 코드가 문서와 다르고, 의미상으로도 틀렸다
 
-- (해결됨) `ItemException`이 `HttpStatus` 필드를 갖도록 리팩터링되어, `ItemService.update`는 이제 소유자가 아니면 `ItemException(HttpStatus.FORBIDDEN, ...)`을 던지고 `GlobalExceptionHandler`도 `e.getHttpStatus()`로 응답한다 — PATCH는 문서(403)와 실제가 일치함([`docs/orders-review.md`](orders-review.md) "해결됨" 섹션과 동일 작업).
+- (해결됨) `ItemException`이 `ErrorCode`(공통 부모 `ApplicationException` 경유)를 갖도록 리팩터링되어, `ItemService.update`는 이제 소유자가 아니면 `ItemException(ErrorCode.FORBIDDEN, ...)`을 던지고 `GlobalExceptionHandler`도 `e.getErrorCode().getStatus()`로 응답한다 — PATCH는 문서(403)와 실제가 일치함([`docs/orders-review.md`](orders-review.md) "해결됨" 섹션과 동일 작업). 에러 응답도 `{error, message}` JSON 포맷으로 나간다.
 - `ItemService.delete`는 여전히 소유자가 아니면 `UnauthorizedException`(원래 "로그인 안 됨"을 뜻하는 예외)을 재사용해 401로 나간다. 문서(403)와 다르며, DELETE만 남은 이슈.
 
 ### 2. 상품 저장/수정 시 이미지 파일이 등록되지만 클린업이 전혀 없다

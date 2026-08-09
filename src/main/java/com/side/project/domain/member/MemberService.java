@@ -5,11 +5,13 @@ import com.side.project.domain.member.memberdto.MemberInfoDto;
 import com.side.project.domain.member.memberdto.ShopInfoDto;
 import com.side.project.domain.member.memberdto.MemberSaveDto;
 import com.side.project.domain.member.memberdto.MemberUpdateDto;
+import com.side.project.web.exception.ErrorCode;
 import com.side.project.web.exception.login.UnauthorizedException;
 import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.login.LoginMember;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,20 +24,21 @@ import java.util.Optional;
 public class MemberService {
 
     private final MemberRepository memberRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public Long join(MemberSaveDto memberForm) {
         checkDuplicate(memberForm);
-        Member member = new Member(memberForm.getLoginId(),memberForm.getName(),memberForm.getPassword(), memberForm.getNickname() ,memberForm.getAddress());
+        Member member = new Member(memberForm.getLoginId(),memberForm.getName(),passwordEncoder.encode(memberForm.getPassword()), memberForm.getNickname() ,memberForm.getAddress());
         return memberRepository.save(member).getId();
     }
 
     private void checkDuplicate(MemberSaveDto memberForm) {
         if (checkLoginIdDuplicate(memberForm.getLoginId())) {
-            throw new DuplicateMemberException("이미 사용 중인 로그인 ID입니다.");
+            throw new DuplicateMemberException(ErrorCode.DUPLICATE_MEMBER, "이미 사용 중인 로그인 ID입니다.");
         }
         if (checkNicknameDuplicate(memberForm.getNickname())) {
-            throw new DuplicateMemberException("이미 사용 중인 닉네임입니다.");
+            throw new DuplicateMemberException(ErrorCode.DUPLICATE_NICKNAME, "이미 사용 중인 닉네임입니다.");
         }
     }
 
@@ -86,10 +89,15 @@ public class MemberService {
         memberRepository.findByNickName(memberUpdateDto.getNickname())
                 .filter(existing -> !existing.getId().equals(member.getId()))
                 .ifPresent(existing -> {
-                    throw new DuplicateMemberException("이미 사용 중인 닉네임입니다.");
+                    throw new DuplicateMemberException(ErrorCode.DUPLICATE_NICKNAME, "이미 사용 중인 닉네임입니다.");
                 });
 
+        if (memberUpdateDto.getPassword() != null) {
+            memberUpdateDto.setPassword(passwordEncoder.encode(memberUpdateDto.getPassword()));
+        }
         member.updateMember(memberUpdateDto);
+        // 응답 바디로 그대로 반환되는 dto라 해시가 노출되지 않도록 원본 값을 지운다
+        memberUpdateDto.setPassword(null);
         return memberUpdateDto;
     }
 }

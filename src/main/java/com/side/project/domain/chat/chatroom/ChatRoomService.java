@@ -16,6 +16,7 @@ import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
 import com.side.project.domain.orders.Orders;
 import com.side.project.domain.orders.OrdersService;
+import com.side.project.web.exception.ErrorCode;
 import com.side.project.web.exception.chat.message.ChatMessageException;
 import com.side.project.web.exception.chat.room.ChatRoomException;
 import com.side.project.web.exception.item.ItemException;
@@ -24,7 +25,6 @@ import com.side.project.web.exception.member.MemberException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,11 +44,11 @@ public class ChatRoomService {
 
     @Transactional
     public ChatRoomResponse createChatRoom(Long itemId , Long buyerId) {
-        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."));
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(ErrorCode.NOT_FOUND_ITEM, "상품을 찾을 수 없습니다."));
 
         Long sellerId = item.getSeller().getId();
         if (sellerId.equals(buyerId)) {
-            throw new ChatRoomException(HttpStatus.CONFLICT,"본인이 등록한 상품에는 문의할 수 없습니다.");
+            throw new ChatRoomException(ErrorCode.CONFLICT_STATE,"본인이 등록한 상품에는 문의할 수 없습니다.");
         }
 
         Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
@@ -85,13 +85,13 @@ public class ChatRoomService {
 
     @Transactional
     public ChatRoomAndMessageDto createOffer(Long itemId, Long buyerId, ChatRoomRequest request) {
-        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(ErrorCode.NOT_FOUND_ITEM, "상품을 찾을 수 없습니다"));
         if (item.getStatus() != ItemStatus.SELLING) {
-            throw new ItemException(HttpStatus.CONFLICT, "이미 거래 중이거나 완료된 상품입니다.");
+            throw new ItemException(ErrorCode.CONFLICT_STATE, "이미 거래 중이거나 완료된 상품입니다.");
         }
         Long sellerId = item.getSeller().getId();
         if (sellerId.equals(buyerId)) {
-            throw new ChatRoomException(HttpStatus.CONFLICT,"본인이 등록한 상품에는 문의할 수 없습니다.");
+            throw new ChatRoomException(ErrorCode.CONFLICT_STATE,"본인이 등록한 상품에는 문의할 수 없습니다.");
         }
 
         Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
@@ -126,7 +126,7 @@ public class ChatRoomService {
             throw new ChatMessageException("이미 처리된 제안입니다.");
         }
         if (item.getStatus() != ItemStatus.SELLING) {
-            throw new ItemException(HttpStatus.CONFLICT, "이미 거래 중이거나 완료된 상품입니다.");
+            throw new ItemException(ErrorCode.CONFLICT_STATE, "이미 거래 중이거나 완료된 상품입니다.");
         }
 
         Orders orders = ordersService.rejectNegotiation(item.getId(), offeredMessage.getSender().getId(), sellerId);
@@ -154,7 +154,7 @@ public class ChatRoomService {
             throw new ChatMessageException("이미 처리된 제안입니다.");
         }
         if (item.getStatus() != ItemStatus.SELLING) {
-            throw new ItemException(HttpStatus.CONFLICT, "이미 거래 중이거나 완료된 상품입니다.");
+            throw new ItemException(ErrorCode.CONFLICT_STATE, "이미 거래 중이거나 완료된 상품입니다.");
         }
 
         Integer offeredPrice = offeredMessage.getOfferedPrice();
@@ -167,10 +167,10 @@ public class ChatRoomService {
     }
 
     private ChatRoom chatRoomContainMember(Long roomId, Long memberId) {
-        ChatRoom chatRoom = chatRoomRepository.chatRoomFetchJoinItem(roomId).orElseThrow(() -> new ChatRoomException(HttpStatus.NOT_FOUND, "채팅방을 찾을 수 없습니다."));
+        ChatRoom chatRoom = chatRoomRepository.chatRoomFetchJoinItem(roomId).orElseThrow(() -> new ChatRoomException(ErrorCode.NOT_FOUND_CHATROOM, "채팅방을 찾을 수 없습니다."));
 
         if (!chatRoom.containsMember(memberId)) {
-            throw new ChatRoomException(HttpStatus.FORBIDDEN, "해당 채팅방에 참여할 수 없습니다.");
+            throw new ChatRoomException(ErrorCode.FORBIDDEN, "해당 채팅방에 참여할 수 없습니다.");
         }
         return chatRoom;
     }

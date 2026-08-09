@@ -4,7 +4,6 @@ import com.side.project.domain.activitylog.ActivityType;
 import com.side.project.domain.activitylog.event.UserActivityEvent;
 import com.side.project.web.SessionConst;
 import com.side.project.web.login.LoginMember;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -82,20 +81,16 @@ public class ActivityLogAspect {
         if (!logUserActivity.memberIdExpr().isEmpty()) {
             return evaluate(logUserActivity.memberIdExpr(), context, Long.class);
         }
-        return resolveMemberIdFromSession();
+        return resolveMemberIdFromRequest();
     }
 
-    private Long resolveMemberIdFromSession() {
+    private Long resolveMemberIdFromRequest() {
         ServletRequestAttributes attributes =
                 (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
         if (attributes == null) {
             return null;
         }
-        HttpSession session = attributes.getRequest().getSession(false);
-        if (session == null) {
-            return null;
-        }
-        Object loginMember = session.getAttribute(SessionConst.LOGIN_MEMBER);
+        Object loginMember = attributes.getRequest().getAttribute(SessionConst.LOGIN_MEMBER);
         if (!(loginMember instanceof LoginMember member)) {
             return null;
         }

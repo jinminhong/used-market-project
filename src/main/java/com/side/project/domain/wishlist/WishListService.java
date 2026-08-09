@@ -8,6 +8,7 @@ import com.side.project.domain.member.MemberRepository;
 import com.side.project.domain.wishlist.repository.WishListRepository;
 import com.side.project.domain.wishlist.wishlistdto.WishListPageResponseDto;
 import com.side.project.domain.wishlist.wishlistdto.WishListResponseDto;
+import com.side.project.web.exception.ErrorCode;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.exception.wishlist.WishListException;
@@ -17,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +41,7 @@ public class WishListService {
     @LogUserActivity(type = ActivityType.WISHLIST_ADD, itemIdExpr = "#itemId", memberIdExpr = "#memberId")
     public void addWishList(Long itemId , Long memberId) {
         if (existWishList(itemId, memberId)) throw new WishListException("이미 찜한 상품입니다.");
-        Item item = itemRepository.findById(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다."));
+        Item item = itemRepository.findById(itemId).orElseThrow(() -> new ItemException(ErrorCode.NOT_FOUND_ITEM, "상품을 찾을 수 없습니다."));
         Member member = memberRepository.findById(memberId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
         wishListRepository.save(new WishList(item , member));
     }

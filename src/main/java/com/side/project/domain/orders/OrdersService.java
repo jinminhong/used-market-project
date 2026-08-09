@@ -12,6 +12,7 @@ import com.side.project.domain.orders.ordersdto.SalesPageResponseDto;
 import com.side.project.domain.orders.ordersdto.TrackingUpdateDto;
 import com.side.project.domain.orders.repository.OrdersRepository;
 import com.side.project.domain.ordershistory.OrdersHistoryService;
+import com.side.project.web.exception.ErrorCode;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.member.MemberException;
 import com.side.project.web.exception.orders.OrdersException;
@@ -20,7 +21,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,12 +41,12 @@ public class OrdersService {
     @Transactional
     @LogUserActivity(type = ActivityType.ORDER_CREATE, itemIdExpr = "#itemId", memberIdExpr = "#buyerId")
     public Orders save(Long itemId, Long buyerId ,OrderStatus orderStatus) {
-        Item item = itemRepository.findByIdWithMemberForUpdate(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMemberForUpdate(itemId).orElseThrow(() -> new ItemException(ErrorCode.NOT_FOUND_ITEM, "상품을 찾을 수 없습니다"));
         if (!item.getStatus().equals(SELLING)) {
-            throw new ItemException(HttpStatus.CONFLICT, "구매할 수 없는 상품입니다");
+            throw new ItemException(ErrorCode.CONFLICT_STATE, "구매할 수 없는 상품입니다");
         }
         if (item.getSeller().getId().equals(buyerId)) {
-            throw new ItemException(HttpStatus.FORBIDDEN, "본인이 등록한 상품은 구매할 수 없습니다.");
+            throw new ItemException(ErrorCode.FORBIDDEN, "본인이 등록한 상품은 구매할 수 없습니다.");
         }
         Member member = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
         Orders orders = new Orders();
@@ -58,12 +58,12 @@ public class OrdersService {
 
     @Transactional
     public Orders createNegotiationOrder(Long itemId, Long buyerId, Integer offeredPrice) {
-        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(ErrorCode.NOT_FOUND_ITEM, "상품을 찾을 수 없습니다"));
         if (!item.getStatus().equals(SELLING)) {
-            throw new ItemException(HttpStatus.CONFLICT, "구매할 수 없는 상품입니다");
+            throw new ItemException(ErrorCode.CONFLICT_STATE, "구매할 수 없는 상품입니다");
         }
         if (item.getSeller().getId().equals(buyerId)) {
-            throw new ItemException(HttpStatus.FORBIDDEN, "본인이 등록한 상품은 구매할 수 없습니다.");
+            throw new ItemException(ErrorCode.FORBIDDEN, "본인이 등록한 상품은 구매할 수 없습니다.");
         }
         Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
 
@@ -81,40 +81,28 @@ public class OrdersService {
 
     @Transactional
     public Orders rejectNegotiation(Long itemId, Long buyerId, Long sellerId) {
-        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMember(itemId).orElseThrow(() -> new ItemException(ErrorCode.NOT_FOUND_ITEM, "상품을 찾을 수 없습니다"));
         Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
         Orders orders = ordersRepository.findByBuyerAndItemAndOrderStatus(buyer, item, OrderStatus.REQUESTED)
-                .orElseThrow(() -> new OrdersException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+                .orElseThrow(() -> new OrdersException(ErrorCode.NOT_FOUND_ORDER, "주문을 찾을 수 없습니다."));
 
-        requireRole(item.getSeller().getId().equals(sellerId), "판매자만 거절할 수 있습니다.");
-        rejectAccept(orders);
+        orders.reject(sellerId);
         ordersHistoryService.save(orders);
         return orders;
     }
 
     @Transactional
     public Orders acceptNegotiation(Long itemId, Long buyerId, Long sellerId, Integer offeredPrice) {
-        Item item = itemRepository.findByIdWithMemberForUpdate(itemId).orElseThrow(() -> new ItemException(HttpStatus.NOT_FOUND, "상품을 찾을 수 없습니다"));
+        Item item = itemRepository.findByIdWithMemberForUpdate(itemId).orElseThrow(() -> new ItemException(ErrorCode.NOT_FOUND_ITEM, "상품을 찾을 수 없습니다"));
         Member buyer = memberRepository.findById(buyerId).orElseThrow(() -> new MemberException("회원을 찾을 수 없습니다."));
         Orders orders = ordersRepository.findByBuyerAndItemAndOrderStatus(buyer, item, OrderStatus.REQUESTED)
-                .orElseThrow(() -> new OrdersException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
-
-        requireRole(item.getSeller().getId().equals(sellerId), "판매자만 승인할 수 있습니다.");
+                .orElseThrow(() -> new OrdersException(ErrorCode.NOT_FOUND_ORDER, "주문을 찾을 수 없습니다."));
 
         orders.updateAgreedPrice(offeredPrice);
-        applyAccept(orders, item);
+        orders.accept(sellerId);
+        ordersRepository.rejectOtherOrders(item.getId(), orders.getId());
         ordersHistoryService.save(orders);
         return orders;
-    }
-
-    private void applyAccept(Orders orders, Item item) {
-        orders.updateOrderStatus(OrderStatus.RESERVED);
-        item.changeStatus(RESERVED);
-        ordersRepository.rejectOtherOrders(item.getId(), orders.getId());
-    }
-
-    private void rejectAccept(Orders orders) {
-        orders.updateOrderStatus(OrderStatus.REJECTED);
     }
 
     public PurchasesPageResponseDto getPurchasesList(Long memberId , List<OrderStatus> statuses, Pageable pageable) {
@@ -129,10 +117,10 @@ public class OrdersService {
 
     @Transactional
     public OrdersResponseDto registerTracking(Long orderId, Long memberId, TrackingUpdateDto trackingUpdateDto) {
-        Orders orders = ordersRepository.findById(orderId).orElseThrow(() -> new OrdersException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+        Orders orders = ordersRepository.findById(orderId).orElseThrow(() -> new OrdersException(ErrorCode.NOT_FOUND_ORDER, "주문을 찾을 수 없습니다."));
         Item item = orders.getItem();
         if (!item.getSeller().getId().equals(memberId)) {
-            throw new OrdersException(HttpStatus.FORBIDDEN, "본인이 판매한 주문만 운송장을 등록할 수 있습니다.");
+            throw new OrdersException(ErrorCode.FORBIDDEN, "본인이 판매한 주문만 운송장을 등록할 수 있습니다.");
         }
         orders.registerTracking(trackingUpdateDto.getTrackingCompany(), trackingUpdateDto.getTrackingNumber());
 
@@ -157,63 +145,27 @@ public class OrdersService {
     @LogUserActivity(typeExpr = "#action", itemIdExpr = "#result.itemId()", memberIdExpr = "#requesterId")
     public OrdersActionResponseDto changeOrderStatus(Long orderId, String action, Long requesterId) {
         Orders orders = ordersRepository.findById(orderId)
-                .orElseThrow(() -> new OrdersException(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."));
+                .orElseThrow(() -> new OrdersException(ErrorCode.NOT_FOUND_ORDER, "주문을 찾을 수 없습니다."));
         Item item = orders.getItem();
         boolean isBuyer = orders.getBuyer().getId().equals(requesterId);
         boolean isSeller = item.getSeller().getId().equals(requesterId);
         if (!isBuyer && !isSeller) {
-            throw new OrdersException(HttpStatus.FORBIDDEN, "이 주문을 처리할 권한이 없습니다.");
+            throw new OrdersException(ErrorCode.FORBIDDEN, "이 주문을 처리할 권한이 없습니다.");
         }
 
-        OrderStatus before = orders.getOrderStatus();
         switch (action) {
             case "ACCEPT" -> {
-                requireStatus(before, OrderStatus.REQUESTED);
-                requireRole(isSeller, "판매자만 승인할 수 있습니다.");
-                applyAccept(orders, item);
+                orders.accept(requesterId);
+                ordersRepository.rejectOtherOrders(item.getId(), orders.getId());
             }
-            case "PAY" -> {
-                requireStatus(before, OrderStatus.RESERVED);
-                requireRole(isBuyer, "구매자만 결제할 수 있습니다.");
-                orders.updateOrderStatus(OrderStatus.PAY_COMPLETED);
-            }
-            case "SHIP" -> {
-                requireStatus(before, OrderStatus.PAY_COMPLETED);
-                requireRole(isSeller, "판매자만 발송 처리할 수 있습니다.");
-                orders.updateOrderStatus(OrderStatus.SHIPPING);
-            }
-            case "CONFIRM" -> {
-                requireStatus(before, OrderStatus.SHIPPING);
-                requireRole(isBuyer, "구매자만 구매확정할 수 있습니다.");
-                orders.updateOrderStatus(OrderStatus.COMPLETED);
-                item.changeStatus(SOLD);
-            }
-            case "CANCEL" -> {
-                if (before == OrderStatus.COMPLETED || before == OrderStatus.CANCELED) {
-                    throw new OrdersException(HttpStatus.CONFLICT, "취소할 수 없는 주문입니다.");
-                }
-                if (before == OrderStatus.PAY_COMPLETED || before == OrderStatus.SHIPPING) {
-                    requireRole(isSeller, "판매자 동의가 필요합니다.");
-                }
-                orders.updateOrderStatus(OrderStatus.CANCELED);
-                item.changeStatus(SELLING);
-            }
-            default -> throw new OrdersException(HttpStatus.CONFLICT, "알 수 없는 action 입니다.");
+            case "PAY" -> orders.pay(requesterId);
+            case "SHIP" -> orders.ship(requesterId);
+            case "CONFIRM" -> orders.confirm(requesterId);
+            case "CANCEL" -> orders.cancel(requesterId);
+            default -> throw new OrdersException(ErrorCode.CONFLICT_STATE, "알 수 없는 action 입니다.");
         }
 
         ordersHistoryService.save(orders);
         return new OrdersActionResponseDto(orders.getId(), item.getId(), orders.getOrderStatus(), item.getStatus());
-    }
-
-    private void requireStatus(OrderStatus before, OrderStatus expected) {
-        if (before != expected) {
-            throw new OrdersException(HttpStatus.CONFLICT, "잘못된 순서의 상태 변경입니다.");
-        }
-    }
-
-    private void requireRole(boolean allowed, String message) {
-        if (!allowed) {
-            throw new OrdersException(HttpStatus.FORBIDDEN, message);
-        }
     }
 }

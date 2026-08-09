@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../context/SessionContext.jsx";
 import { normalizeMember } from "../api/normalize.js";
+import { tokenStore } from "../api/tokenStore.js";
 import { Tabs, TabsList, TabsTrigger } from "../components/ui/tabs.jsx";
 import { Input } from "../components/ui/input.jsx";
 import { Button } from "../components/ui/button.jsx";
@@ -80,11 +81,13 @@ export default function Auth() {
           },
         });
         const signedUpMember = await api.login({ loginId: form.loginId, password: form.password });
+        tokenStore.set(signedUpMember.accessToken);
         setMember(normalizeMember(signedUpMember));
         navigate(searchParams.get("next") || "/");
         return;
       }
       const loginMember = await api.login({ loginId: form.loginId, password: form.password });
+      tokenStore.set(loginMember.accessToken);
       setMember(normalizeMember(loginMember));
       navigate(searchParams.get("next") || "/");
     }, mode === "signup" ? "회원가입이 완료되었습니다." : "로그인되었습니다.");

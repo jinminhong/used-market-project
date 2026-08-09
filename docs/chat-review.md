@@ -6,7 +6,7 @@
 
 - **메시지 이력 조회** — 과거 `ChatRoomController`에 주석 처리되어 있었으나 현재 `GET /api/chat/rooms/{roomId}`로 완전히 구현·활성화되어 있다(`ChatRoomService.getMessages`).
 - **채팅방 목록 조회 API** — `GET /api/chat/rooms/me`로 구현되어 있고, 프론트(`ChatList.jsx`)도 이 API로 연동되어 있다(과거의 localStorage 우회는 제거됨).
-- **`ChatRoomException` HTTP 매핑 누락** — `GlobalExceptionHandler.chatRoomException(ChatRoomException e)`가 `e.getHttpStatus()`를 반환하도록 이미 수정되어, 401/403/404/409가 정상적으로 나간다.
+- **`ChatRoomException` HTTP 매핑 누락** — `ChatRoomException`이 공통 부모 `ApplicationException`의 `ErrorCode`를 통해 상태코드를 갖고, `GlobalExceptionHandler.applicationException`이 `e.getErrorCode().getStatus()`로 응답하도록 이미 수정되어, 401/403/404/409가 정상적으로 나간다. 응답 바디도 `{error, message}` JSON 포맷이다.
 - **STOMP 목적지 변수 이름 불일치** — 최초 리뷰에서 우려했던 것과 달리 `@DestinationVariable`과 파라미터명(`chatRoomId`)이 일치해 문제 없음.
 - **N+1 쿼리 우려** — `ChatRoomResponse.from`이 `seller.getId()`처럼 식별자만 접근하므로 Hibernate 프록시 특성상 추가 쿼리가 발생하지 않는다. `seller`의 다른 필드(nickname 등)를 노출하게 되면 그때 fetch join을 추가해야 한다.
 - **채팅 예외에 대한 STOMP 레벨 에러 처리가 없음** — `ChatMessageController`에 `@MessageExceptionHandler(ChatMessageException.class)`/`@MessageExceptionHandler(ChatRoomException.class)`/`@MessageExceptionHandler(MethodArgumentNotValidException.class)`를 추가해 예외 발생 시 서버 로그(slf4j `warn`)를 남기도록 했다. `/user/queue/errors` 같은 개인 큐로 `{error, message}`를 클라이언트에 돌려주는 것은 STOMP Principal(커스텀 `DefaultHandshakeHandler`)이 추가로 필요해 후속 과제로 남겨둔다.

@@ -100,7 +100,7 @@ class ChatRoomServiceTest {
 
         assertThatThrownBy(() -> chatRoomService.createChatRoom(-1L, buyer.getId()))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -111,7 +111,7 @@ class ChatRoomServiceTest {
 
         assertThatThrownBy(() -> chatRoomService.createChatRoom(item.getId(), seller.getId()))
                 .isInstanceOf(ChatRoomException.class)
-                .extracting(e -> ((ChatRoomException) e).getHttpStatus())
+                .extracting(e -> ((ChatRoomException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
@@ -128,7 +128,7 @@ class ChatRoomServiceTest {
     void getMessages_방없음() {
         assertThatThrownBy(() -> chatRoomService.getMessages(-1L, 1L, null))
                 .isInstanceOf(ChatRoomException.class)
-                .extracting(e -> ((ChatRoomException) e).getHttpStatus())
+                .extracting(e -> ((ChatRoomException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -142,7 +142,7 @@ class ChatRoomServiceTest {
 
         assertThatThrownBy(() -> chatRoomService.getMessages(chatRoom.getId(), other.getId(), null))
                 .isInstanceOf(ChatRoomException.class)
-                .extracting(e -> ((ChatRoomException) e).getHttpStatus())
+                .extracting(e -> ((ChatRoomException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
@@ -168,7 +168,7 @@ class ChatRoomServiceTest {
 
         assertThatThrownBy(() -> chatRoomService.createOffer(-1L, buyer.getId(), request))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -181,7 +181,7 @@ class ChatRoomServiceTest {
 
         assertThatThrownBy(() -> chatRoomService.createOffer(item.getId(), buyer.getId(), request))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
@@ -193,7 +193,7 @@ class ChatRoomServiceTest {
 
         assertThatThrownBy(() -> chatRoomService.createOffer(item.getId(), seller.getId(), request))
                 .isInstanceOf(ChatRoomException.class)
-                .extracting(e -> ((ChatRoomException) e).getHttpStatus())
+                .extracting(e -> ((ChatRoomException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 
@@ -278,7 +278,7 @@ class ChatRoomServiceTest {
 
         assertThatThrownBy(() -> chatRoomService.acceptOffer(offerResult.room().roomId(), seller.getId(), offerResult.message().messageId()))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.CONFLICT);
     }
 }

@@ -128,7 +128,7 @@ class ItemServiceTest {
     void findByIdToDto_존재하지않는_상품() {
         assertThatThrownBy(() -> itemService.findByIdToDto(-1L))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -183,7 +183,7 @@ class ItemServiceTest {
 
         assertThatThrownBy(() -> itemService.update(-1L, updateDto, null, seller.getLoginId()))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -196,7 +196,7 @@ class ItemServiceTest {
 
         assertThatThrownBy(() -> itemService.update(item.getId(), updateDto, null, other.getLoginId()))
                 .isInstanceOf(ItemException.class)
-                .extracting(e -> ((ItemException) e).getHttpStatus())
+                .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
     }
 
