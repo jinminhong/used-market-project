@@ -2,7 +2,6 @@ package com.side.project.web.aop;
 
 import com.side.project.domain.activitylog.ActivityType;
 import com.side.project.domain.activitylog.event.UserActivityEvent;
-import com.side.project.web.SessionConst;
 import com.side.project.web.login.LoginMember;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,9 +16,9 @@ import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.lang.reflect.Method;
 
@@ -85,13 +84,8 @@ public class ActivityLogAspect {
     }
 
     private Long resolveMemberIdFromRequest() {
-        ServletRequestAttributes attributes =
-                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attributes == null) {
-            return null;
-        }
-        Object loginMember = attributes.getRequest().getAttribute(SessionConst.LOGIN_MEMBER);
-        if (!(loginMember instanceof LoginMember member)) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !(authentication.getPrincipal() instanceof LoginMember member)) {
             return null;
         }
         return member.getMemberId();

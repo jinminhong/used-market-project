@@ -36,6 +36,10 @@ public class Member {
     @Embedded
     private Address address;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, columnDefinition = "varchar(20) default 'USER'")
+    private Role role = Role.USER;
+
     @OneToMany(mappedBy = "seller")
     private List<Item> itemList = new ArrayList<>();
 

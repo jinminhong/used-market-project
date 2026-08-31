@@ -10,6 +10,7 @@ import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.member.Address;
 import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
+import com.side.project.domain.member.Role;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.exception.login.UnauthorizedException;
 import com.side.project.web.exception.member.DuplicateMemberException;
@@ -136,7 +137,7 @@ class ItemServiceTest {
     void delete_성공() {
         Member seller = createAndSaveMember("seller");
         Item item = createAndSaveItem(seller, ItemStatus.SELLING);
-        LoginMember loginMember = new LoginMember(seller.getId(), seller.getLoginId(), seller.getNickName());
+        LoginMember loginMember = new LoginMember(seller.getId(), seller.getLoginId(), seller.getNickName(), seller.getRole());
 
         itemService.delete(item.getId(), loginMember);
 
@@ -146,7 +147,7 @@ class ItemServiceTest {
     @Test
     void delete_존재하지않는_상품() {
         Member seller = createAndSaveMember("seller");
-        LoginMember loginMember = new LoginMember(seller.getId(), seller.getLoginId(), seller.getNickName());
+        LoginMember loginMember = new LoginMember(seller.getId(), seller.getLoginId(), seller.getNickName(), seller.getRole());
 
         assertThatThrownBy(() -> itemService.delete(-1L, loginMember))
                 .isInstanceOf(ItemException.class);
@@ -157,7 +158,7 @@ class ItemServiceTest {
         Member seller = createAndSaveMember("seller");
         Member other = createAndSaveMember("other");
         Item item = createAndSaveItem(seller, ItemStatus.SELLING);
-        LoginMember loginMember = new LoginMember(other.getId(), other.getLoginId(), other.getNickName());
+        LoginMember loginMember = new LoginMember(other.getId(), other.getLoginId(), other.getNickName(), other.getRole());
 
         assertThatThrownBy(() -> itemService.delete(item.getId(), loginMember))
                 .isInstanceOf(UnauthorizedException.class);

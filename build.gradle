@@ -27,6 +27,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-websocket'
 	implementation 'org.springframework.boot:spring-boot-starter-batch-jdbc'
 	implementation 'org.springframework.boot:spring-boot-starter-aspectj'
+	implementation 'org.springframework.boot:spring-boot-starter-security'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.h2database:h2'
 	annotationProcessor 'org.projectlombok:lombok'
@@ -46,9 +47,6 @@ dependencies {
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
-
-	// 비밀번호 해싱 (BCrypt) - Spring Security 전체 미도입, 순수 crypto 유틸만 사용
-	implementation 'org.springframework.security:spring-security-crypto'
 
 }
 

@@ -1,5 +1,6 @@
 package com.side.project.web.jwt;
 
+import com.side.project.domain.member.Role;
 import com.side.project.web.login.LoginMember;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -21,6 +22,7 @@ public class JwtTokenProvider {
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String CLAIM_LOGIN_ID = "loginId";
     private static final String CLAIM_NICKNAME = "nickname";
+    private static final String CLAIM_ROLE = "role";
     // application.properties의 jwt.secret 기본값과 동일한 문자열 - 배포 시 JWT_SECRET 미설정을 감지하기 위한 기준값
     private static final String LOCAL_DEV_DEFAULT_SECRET = "local-dev-only-secret-change-me-32bytes-minimum";
 
@@ -36,13 +38,14 @@ public class JwtTokenProvider {
         this.accessTokenExpirationMs = accessTokenExpirationMs;
     }
 
-    public String createAccessToken(Long memberId, String loginId, String nickname) {
+    public String createAccessToken(Long memberId, String loginId, String nickname, Role role) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + accessTokenExpirationMs);
         return Jwts.builder()
                 .subject(String.valueOf(memberId))
                 .claim(CLAIM_LOGIN_ID, loginId)
                 .claim(CLAIM_NICKNAME, nickname)
+                .claim(CLAIM_ROLE, role.name())
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(secretKey, Jwts.SIG.HS256)
@@ -76,7 +79,8 @@ public class JwtTokenProvider {
             Long memberId = Long.valueOf(claims.getSubject());
             String loginId = claims.get(CLAIM_LOGIN_ID, String.class);
             String nickname = claims.get(CLAIM_NICKNAME, String.class);
-            return new LoginMember(memberId, loginId, nickname);
+            Role role = Role.valueOf(claims.get(CLAIM_ROLE, String.class));
+            return new LoginMember(memberId, loginId, nickname, role);
         } catch (JwtException | IllegalArgumentException e) {
             throw new JwtAuthenticationException("유효하지 않은 토큰입니다.");
         }

@@ -3,6 +3,7 @@ package com.side.project.domain.member;
 import com.side.project.domain.member.memberdto.MemberInfoDto;
 import com.side.project.domain.member.memberdto.MemberSaveDto;
 import com.side.project.domain.member.memberdto.MemberUpdateDto;
+import com.side.project.domain.member.Role;
 import com.side.project.web.exception.login.UnauthorizedException;
 import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.member.MemberException;
@@ -101,7 +102,7 @@ class MemberServiceTest {
     @Test
     void update_성공() {
         Member member = createAndSaveMember("upd");
-        LoginMember loginMember = new LoginMember(member.getId(), member.getLoginId(), member.getNickName());
+        LoginMember loginMember = new LoginMember(member.getId(), member.getLoginId(), member.getNickName(), member.getRole());
         MemberUpdateDto updateDto = new MemberUpdateDto();
         updateDto.setNickname("updatedNick" + UUID.randomUUID().toString().substring(0, 8));
         updateDto.setName("새이름");
@@ -115,7 +116,7 @@ class MemberServiceTest {
 
     @Test
     void update_존재하지않는_회원() {
-        LoginMember loginMember = new LoginMember(-1L, "loginId", "nickname");
+        LoginMember loginMember = new LoginMember(-1L, "loginId", "nickname", Role.USER);
         MemberUpdateDto updateDto = new MemberUpdateDto();
 
         assertThatThrownBy(() -> memberService.update(loginMember, updateDto))
@@ -125,7 +126,7 @@ class MemberServiceTest {
     @Test
     void update_로그인아이디_불일치() {
         Member member = createAndSaveMember("mismatch");
-        LoginMember loginMember = new LoginMember(member.getId(), "otherLoginId", member.getNickName());
+        LoginMember loginMember = new LoginMember(member.getId(), "otherLoginId", member.getNickName(), member.getRole());
         MemberUpdateDto updateDto = new MemberUpdateDto();
 
         assertThatThrownBy(() -> memberService.update(loginMember, updateDto))
@@ -136,7 +137,7 @@ class MemberServiceTest {
     void update_닉네임_중복_타인() {
         Member member = createAndSaveMember("me");
         Member other = createAndSaveMember("other");
-        LoginMember loginMember = new LoginMember(member.getId(), member.getLoginId(), member.getNickName());
+        LoginMember loginMember = new LoginMember(member.getId(), member.getLoginId(), member.getNickName(), member.getRole());
         MemberUpdateDto updateDto = new MemberUpdateDto();
         updateDto.setNickname(other.getNickName());
 

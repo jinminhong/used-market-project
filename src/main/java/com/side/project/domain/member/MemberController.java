@@ -4,12 +4,12 @@ import com.side.project.domain.member.memberdto.MemberInfoDto;
 import com.side.project.domain.member.memberdto.ShopInfoDto;
 import com.side.project.domain.member.memberdto.MemberSaveDto;
 import com.side.project.domain.member.memberdto.MemberUpdateDto;
-import com.side.project.web.argumentresolver.Login;
 import com.side.project.web.login.LoginMember;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -28,13 +28,13 @@ public class MemberController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<MemberInfoDto> getMyInfo(@Login LoginMember loginMember) {
+    public ResponseEntity<MemberInfoDto> getMyInfo(@AuthenticationPrincipal LoginMember loginMember) {
         MemberInfoDto myInfo = memberService.getMyInfo(loginMember.getMemberId());
         return ResponseEntity.status(HttpStatus.OK).body(myInfo);
     }
 
     @PatchMapping("/me")
-    public ResponseEntity<?> updateMyInfo(@Login LoginMember loginMember,
+    public ResponseEntity<?> updateMyInfo(@AuthenticationPrincipal LoginMember loginMember,
                                           @RequestBody MemberUpdateDto memberUpdateDto) {
         MemberUpdateDto update = memberService.update(loginMember, memberUpdateDto);
         return ResponseEntity.ok(update);

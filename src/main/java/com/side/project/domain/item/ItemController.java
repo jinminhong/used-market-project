@@ -1,13 +1,13 @@
 package com.side.project.domain.item;
 
 import com.side.project.domain.item.itemdto.*;
-import com.side.project.web.argumentresolver.Login;
 import com.side.project.web.login.LoginMember;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -33,7 +33,7 @@ public class ItemController {
     @PostMapping(value = "/items" ,consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> saveItem(@RequestPart("itemSaveDto") ItemSaveDto itemSaveDto,
                                       @RequestPart("multipartFiles") List<MultipartFile> multipartFiles,
-                                      @Login LoginMember loginMember) throws IOException {
+                                      @AuthenticationPrincipal LoginMember loginMember) throws IOException {
         Long itemId = itemService.save(itemSaveDto, loginMember.getLoginId() ,multipartFiles);
         itemSaveDto.setItemId(itemId);
         return ResponseEntity.status(HttpStatus.CREATED).body(itemSaveDto);
@@ -49,7 +49,7 @@ public class ItemController {
     //상세 상품 수정
     @PatchMapping(value = "/items/{itemId}" ,consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> patchItem(@PathVariable Long itemId ,
-                                             @Login LoginMember loginMember,
+                                             @AuthenticationPrincipal LoginMember loginMember,
                                              @RequestPart("itemUpdateDto") ItemUpdateDto itemUpdateDto,
                                              @RequestPart(value = "multipartFiles", required = false) List<MultipartFile> multipartFiles
                                        ) throws IOException {
@@ -61,7 +61,7 @@ public class ItemController {
 
     @DeleteMapping("/items/{itemId}")
     public ResponseEntity<String> delete(@PathVariable Long itemId,
-                                         @Login LoginMember loginMember) {
+                                         @AuthenticationPrincipal LoginMember loginMember) {
         itemService.delete(itemId , loginMember);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).body("삭제 완료");
     }

@@ -66,7 +66,7 @@ public class LoginController {
     }
 
     private TokenResponse toTokenResponse(Member member) {
-        String accessToken = jwtTokenProvider.createAccessToken(member.getId(), member.getLoginId(), member.getNickName());
+        String accessToken = jwtTokenProvider.createAccessToken(member.getId(), member.getLoginId(), member.getNickName(), member.getRole());
         return new TokenResponse(accessToken, jwtTokenProvider.getAccessTokenExpirationMs() / 1000,
                 member.getId(), member.getLoginId(), member.getNickName());
     }
