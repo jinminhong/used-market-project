@@ -16,12 +16,14 @@ import com.side.project.domain.member.MemberRepository;
 import com.side.project.domain.orders.OrderStatus;
 import com.side.project.domain.orders.Orders;
 import com.side.project.domain.orders.repository.OrdersRepository;
+import com.side.project.config.TestcontainersConfig;
 import com.side.project.domain.ordershistory.OrdersHistoryRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.UUID;
@@ -42,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * rejectOtherOrders와 ChatMessageService.acceptOffer의 rejectOtherOffers를 한 번에 실제로 검증한다.
  * @Transactional은 붙이지 않는다 (진짜 동시 접근 재현을 위해).
  */
+@Import(TestcontainersConfig.class)
 @SpringBootTest
 class ChatRoomServiceConcurrencyTest {
 

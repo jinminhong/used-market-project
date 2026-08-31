@@ -8,7 +8,9 @@
 
 ### GET /api/items
 
-**상태**: 구현됨. 인증 불필요. `page`/`size`/`keyword`/`category`/`status`/`priceGoe`/`priceLoe` 쿼리로 QueryDSL 동적 검색, `{ list, hasNext }` Slice 응답. 목록 항목은 `thumbnailFilename` 문자열 하나만 포함(이미지 URL은 `/api/images/{그 값}`로 조립).
+**상태**: 구현됨. 인증 불필요. `page`/`size`/`keyword`/`category`/`status`/`priceGoe`/`priceLoe` 쿼리로 동적 검색, `{ list, hasNext }` Slice 응답. 목록 항목은 `thumbnailFilename` 문자열 하나만 포함(이미지 URL은 `/api/images/{그 값}`로 조립).
+
+`keyword`가 있으면 QueryDSL LIKE 검색이 아니라 **Gemini 임베딩 기반 벡터(코사인) 유사도 검색**으로 동작한다(2026-09-01 전환). category/status/priceGoe/priceLoe는 그대로 정확 매칭 필터로 결합된다. 판매자 닉네임 부분일치는 더 이상 지원하지 않는다(상품명/설명 의미 검색으로 성격이 바뀜). 상세: `items-review.md`.
 
 ---
 

@@ -2,10 +2,9 @@ package com.side.project.domain.item;
 
 import com.side.project.domain.item.itemdto.ItemDto;
 import com.side.project.domain.item.itemdto.ItemSaveDto;
-import com.side.project.domain.item.itemdto.ItemSearchCondition;
 import com.side.project.domain.item.itemdto.ItemUpdateDto;
-import com.side.project.domain.item.itemdto.PageResponseDto;
 import com.side.project.domain.item.repository.ItemRepository;
+import com.side.project.config.TestcontainersConfig;
 import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.member.Address;
 import com.side.project.domain.member.Member;
@@ -19,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -35,6 +35,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(TestcontainersConfig.class)
 @SpringBootTest
 @Transactional
 class ItemServiceTest {
@@ -199,23 +200,5 @@ class ItemServiceTest {
                 .isInstanceOf(ItemException.class)
                 .extracting(e -> ((ItemException) e).getErrorCode().getStatus())
                 .isEqualTo(HttpStatus.FORBIDDEN);
-    }
-
-    @Test
-    void searchItems_키워드로_조회된다() {
-        Member seller = createAndSaveMember("seller");
-        String uniqueName = "유니크상품" + UUID.randomUUID();
-        Item item = new Item(uniqueName, "설명", 10000, ItemStatus.SELLING, Category.TOP, seller);
-        item.addItemImage(new ItemImage("original.png", "stored.png"));
-        itemRepository.save(item);
-
-        ItemSearchCondition condition = new ItemSearchCondition();
-        condition.setKeyword(uniqueName);
-
-        PageResponseDto result = itemService.searchItems(condition, 0, 10);
-
-        assertThat(result.getList()).hasSize(1);
-        assertThat(result.getList().get(0).getItemId()).isEqualTo(item.getId());
-        assertThat(result.isHasNext()).isFalse();
     }
 }

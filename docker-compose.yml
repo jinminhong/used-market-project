@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: used-market-postgres
+    environment:
+      POSTGRES_DB: used_market
+      POSTGRES_USER: used_market
+      POSTGRES_PASSWORD: used_market
+    ports:
+      # 호스트에 이미 네이티브 PostgreSQL(5432)이 떠 있어 5433으로 매핑한다.
+      - "5433:5432"
+    volumes:
+      - used-market-pgdata:/var/lib/postgresql/data
+
+volumes:
+  used-market-pgdata:

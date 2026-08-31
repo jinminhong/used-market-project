@@ -14,11 +14,13 @@ import com.side.project.domain.itemimage.ItemImage;
 import com.side.project.domain.member.Address;
 import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
+import com.side.project.config.TestcontainersConfig;
 import com.side.project.web.exception.chat.message.ChatMessageException;
 import com.side.project.web.exception.chat.room.ChatRoomException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +29,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+@Import(TestcontainersConfig.class)
 @SpringBootTest
 @Transactional
 class ChatMessageServiceTest {

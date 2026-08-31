@@ -10,12 +10,14 @@ import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
 import com.side.project.domain.ordershistory.OrdersHistoryRepository;
 import com.side.project.domain.orders.repository.OrdersRepository;
+import com.side.project.config.TestcontainersConfig;
 import com.side.project.web.exception.item.ItemException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 
 import java.util.List;
 import java.util.UUID;
@@ -32,6 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 실제 동시 접근(별도 커넥션/트랜잭션)이 재현되지 않기 때문이다.
  * 대신 각 테스트가 만든 row를 @AfterEach에서 FK 역순으로 직접 정리한다.
  */
+@Import(TestcontainersConfig.class)
 @SpringBootTest
 class OrdersServiceConcurrencyTest {
 

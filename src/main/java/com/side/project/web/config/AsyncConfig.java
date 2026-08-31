@@ -27,6 +27,18 @@ public class AsyncConfig implements AsyncConfigurer {
         return executor;
     }
 
+    // Gemini 임베딩 호출은 activityLogExecutor보다 네트워크 지연이 크고 실패 가능성도 있어 별도 풀로 격리한다.
+    @Bean(name = "itemEmbeddingExecutor")
+    public Executor itemEmbeddingExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(1);
+        executor.setMaxPoolSize(2);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("item-embedding-");
+        executor.initialize();
+        return executor;
+    }
+
     @Override
     public Executor getAsyncExecutor() {
         return activityLogExecutor();

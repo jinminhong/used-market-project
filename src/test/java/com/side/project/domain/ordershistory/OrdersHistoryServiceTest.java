@@ -10,10 +10,12 @@ import com.side.project.domain.member.Member;
 import com.side.project.domain.member.MemberRepository;
 import com.side.project.domain.orders.OrderStatus;
 import com.side.project.domain.orders.Orders;
+import com.side.project.config.TestcontainersConfig;
 import com.side.project.domain.orders.repository.OrdersRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -21,6 +23,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Import(TestcontainersConfig.class)
 @SpringBootTest
 @Transactional
 class OrdersHistoryServiceTest {

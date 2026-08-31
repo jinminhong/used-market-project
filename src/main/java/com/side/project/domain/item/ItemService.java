@@ -1,6 +1,8 @@
 package com.side.project.domain.item;
 
 import com.side.project.domain.activitylog.ActivityType;
+import com.side.project.domain.item.embedding.ItemEmbeddingRequestedEvent;
+import com.side.project.domain.item.embedding.ItemEmbeddingSourceHash;
 import com.side.project.domain.item.itemdto.*;
 import com.side.project.web.aop.LogUserActivity;
 import com.side.project.domain.item.repository.ItemRepository;
@@ -16,6 +18,7 @@ import com.side.project.web.exception.member.DuplicateMemberException;
 import com.side.project.web.exception.item.ItemException;
 import com.side.project.web.login.LoginMember;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -36,6 +39,7 @@ public class ItemService {
     private final MemberRepository memberRepository;
     private final FileStore fileStore;
     private final ItemImageRepository itemImageRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public Long save(ItemSaveDto itemSaveDto, String loginId ,List<MultipartFile> multipartFiles) throws IOException {
@@ -58,7 +62,7 @@ public class ItemService {
         }
 
         itemRepository.save(item);
-
+        eventPublisher.publishEvent(new ItemEmbeddingRequestedEvent(item.getId()));
 
         return item.getId();
     }
@@ -123,7 +127,13 @@ public class ItemService {
             }
         }
 
+        String previousHash = ItemEmbeddingSourceHash.of(item.getName(), item.getDescription());
         item.updateItem(itemUpdateDto);
+        String currentHash = ItemEmbeddingSourceHash.of(item.getName(), item.getDescription());
+        if (!currentHash.equals(previousHash)) {
+            eventPublisher.publishEvent(new ItemEmbeddingRequestedEvent(item.getId()));
+        }
+
         return new ItemDto(item);
     }
 

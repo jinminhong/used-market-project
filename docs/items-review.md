@@ -9,6 +9,7 @@
 - **이미지 400/404에 바디 없음** — 여전히 유효. `ItemImageController.image`가 `.badRequest().build()`/`.notFound().build()`만 반환한다.
 - **이미지 경로 탈출 방어는 실제로 되어 있음** — `storedFilename`의 `..`/`/`/`\` 블랙리스트 + `Paths.get(...).normalize()` 이중 방어, UUID 기반 저장 파일명이라 문제 없음.
 - **QueryDSL `searchItems`의 N+1 우려는 실제로는 없음** — `QItemListDto` 프로젝션으로 `item`/`member`/`thumbnailImage`를 한 쿼리에서 select하고 DTO를 반환하므로 지연 로딩이 없다.
+- (2026-09-01, 해결됨) **`keyword` 검색의 LIKE 인덱스 미스** — H2→PostgreSQL+pgvector 전환과 함께 `keyword`가 있는 경우 `ItemRepositoryImpl.searchByVector`(네이티브 쿼리, `embedding <=> CAST(:queryVector AS vector)` + HNSW 인덱스)로 완전히 대체됐다. `keyword`가 없으면 기존 QueryDSL 필터 경로(`searchByFilters`)가 그대로 쓰인다. 상품명/설명은 `ItemService.save`/`update` 커밋 후 비동기로 임베딩되며(`domain/item/embedding/*`), **판매자 닉네임 부분일치는 더 이상 지원하지 않는다** — 시맨틱 검색의 목적이 상품명/설명 의미 검색이라 성격이 다르기 때문에 의도적으로 제거함.
 
 ## 남은 이슈
 
@@ -42,7 +43,7 @@
 - `Item.addItemImage`/`removeItemImage`가 양방향 연관관계 편의 메서드로 잘 캡슐화돼 있고, 썸네일 자동 지정 로직도 합리적이다.
 - 이미지 서빙 경로의 경로 탈출 방어는 블랙리스트 + `normalize()` 이중 방어로 충분하다.
 - `ItemRepository.findByIdWithMemberForUpdate`(비관적 락)가 이미 존재해 동시성 제어 필요성을 인지하고 설계된 흔적이 있다(다만 `ItemService.update`는 락 없는 `findById`를 써서 PATCH 경로가 이를 우회함 — 이슈 1과 함께 참고).
-- `keywordLike`가 상품명뿐 아니라 판매자 닉네임까지 검색하는 건 UX 관점에서 합리적이다.
+- `keyword` 유무로 필터 경로/벡터 경로를 분기하는 `ItemRepositoryImpl.searchItems`의 구조가 깔끔하고, 임베딩 생성이 `ActivityLogAspect`와 동일한 `@Async` + `@TransactionalEventListener(AFTER_COMMIT)` 패턴을 재사용해 기존 코드 스타일과 일관적이다.
 
 ## 다음에 손대면 좋을 순서
 
@@ -51,6 +52,6 @@
 3. **DELETE의 권한 오류를 `ItemException(FORBIDDEN)`으로 교체** — PATCH는 이미 고쳐졌으니(위 1번) `ItemService.delete`의 `UnauthorizedException` 재사용만 정리하면 됨.
 4. **업로드 파일 확장자/MIME 화이트리스트 추가**(jpg/jpeg/png/webp 등) — 저장형 XSS 가능성 제거.
 5. **`ItemController`의 `@RequestPart` DTO에 `@Valid` 적용** — 이미 DTO에 붙은 애너테이션을 동작시키는 것뿐이라 비용 대비 효과가 크다. `MethodArgumentNotValidException` 핸들러는 이미 있어 추가 인프라 불필요.
-6. (우선순위 낮음) `keyword` 검색의 `LIKE '%...%'` 양쪽 와일드카드는 인덱스를 타지 못한다 — 데이터 규모가 커지면 풀텍스트 검색 도입 검토.
-7. (우선순위 낮음) `ItemService`에 주입된 `ItemImageRepository`가 어디서도 호출되지 않는 죽은 의존성 — 정리하거나 1번 작업 시 실제로 활용.
+6. (우선순위 낮음) `ItemService`에 주입된 `ItemImageRepository`가 어디서도 호출되지 않는 죽은 의존성 — 정리하거나 1번 작업 시 실제로 활용.
+7. (신규, 우선순위 낮음) **임베딩 비동기 지연 중 검색 누락** — `searchByVector`는 `embedding IS NOT NULL` 조건을 걸기 때문에, 상품 등록 직후 비동기 임베딩이 아직 안 끝난 상태(보통 수 초, 최악의 경우 `ItemEmbeddingBackfillScheduler`의 10분 주기까지)에는 자연어 키워드 검색 결과에 노출되지 않는다(필터만 있는 일반 목록에는 정상 노출됨). 등록 직후 즉시 검색 가능해야 한다면 동기 임베딩으로 전환하거나 폴백 LIKE 검색 병행을 검토.
 </content>

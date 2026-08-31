@@ -37,7 +37,7 @@ public class Member {
     private Address address;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, columnDefinition = "varchar(20) default 'USER'")
+    @Column(nullable = false, length = 20)
     private Role role = Role.USER;
 
     @OneToMany(mappedBy = "seller")

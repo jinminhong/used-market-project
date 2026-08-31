@@ -7,6 +7,9 @@ import com.side.project.domain.orders.Orders;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Array;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +59,16 @@ public class Item {
             orphanRemoval = true
     )
     private List<ItemImage> itemImages = new ArrayList<>();
+
+    // 상품명+설명 임베딩(Gemini gemini-embedding-001, 768차원). 비동기로 채워지므로 등록 직후엔 null일 수 있다.
+    @Column
+    @JdbcTypeCode(SqlTypes.VECTOR)
+    @Array(length = 768)
+    private float[] embedding;
+
+    // 마지막으로 임베딩을 생성한 시점의 name+description 해시. 값이 바뀌지 않았으면 재임베딩을 건너뛰기 위한 캐시 키.
+    @Column(name = "embedding_source_hash", length = 64)
+    private String embeddingSourceHash;
 
     public void addItemImage(ItemImage itemImage) {
         itemImages.add(itemImage);
@@ -111,6 +124,11 @@ public class Item {
 
     public void changeStatus(ItemStatus itemStatus){
         this.status = itemStatus;
+    }
+
+    public void applyEmbedding(float[] embedding, String embeddingSourceHash) {
+        this.embedding = embedding;
+        this.embeddingSourceHash = embeddingSourceHash;
     }
 
     public void reopenSelling() {

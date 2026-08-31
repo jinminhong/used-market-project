@@ -39,8 +39,6 @@ public class SecurityConfig {
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(formLogin -> formLogin.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                // H2 콘솔은 iframe으로 렌더링되므로 기본 X-Frame-Options(DENY)를 풀어줘야 동작한다.
-                .headers(headers -> headers.frameOptions(frameOptions -> frameOptions.disable()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/items", "/api/items/**").permitAll()
                         .requestMatchers(
@@ -55,7 +53,6 @@ public class SecurityConfig {
                                 "/css/**",
                                 "/error",
                                 "/api/images/**",
-                                "/h2-console/**",
                                 "/ws-chat/**"
                         ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
