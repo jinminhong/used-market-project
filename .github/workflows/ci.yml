@@ -73,3 +73,16 @@ jobs:
             커밋: `${{ github.sha }}`
             작성자: ${{ github.actor }}
             [실행 로그 보기](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+      # [임시] Discord webhook 연동 확인용. 성공/실패와 무관하게 한 번 알림을 보내 연동을 검증한다.
+      # 검증이 끝나면 이 스텝은 제거한다.
+      - name: "[임시] Discord 연동 테스트"
+        if: always() && env.DISCORD_WEBHOOK != ''
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ env.DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          title: "Discord 연동 테스트 (job: ${{ job.status }})"
+          description: |
+            이 메시지가 채널에 보이면 GitHub Actions → Discord webhook 연동이 정상입니다.
+            커밋: `${{ github.sha }}`
