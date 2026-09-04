@@ -313,10 +313,10 @@ Access Token을 stateless로 두면 탈취 시 만료까지 막을 수 없다. �
 
 **화면 흐름**
 
-| 이미 예약된 상품의 결제 시도 |
-|---|
-| ![결제 가드](./screenshots/06-pessimistic-lock/06-a-checkout-guard-reserved.jpg) |
-| `예약중` 상품의 즉시구매 확인 화면 — "이미 예약되었거나 판매 완료된 상품입니다." 안내와 함께 결제 버튼이 비활성화 |
+| 사전 가드(이미 예약된 상품) | 동시 구매 성공 (200) | 동시 구매 실패 (409) |
+|---|---|---|
+| ![결제 가드](./screenshots/06-pessimistic-lock/06-a-checkout-guard-reserved.jpg) | ![구매 성공](./screenshots/06-pessimistic-lock/06-b-concurrent-purchase-success.jpg) | ![구매 실패](./screenshots/06-pessimistic-lock/06-c-concurrent-purchase-conflict.jpg) |
+| `예약중` 상품의 즉시구매 확인 화면 — "이미 예약되었거나 판매 완료된 상품입니다." 안내와 함께 결제 버튼이 비활성화 | 두 브라우저 세션이 같은 `SELLING` 상품의 결제 확인 화면을 미리 열어둔 채 먼저 "구매 확정하기"를 누른 쪽 — 토스트 "구매가 완료되었습니다." | 곧이어 같은 상품에 결제를 시도한 다른 세션 — 서버가 이미 `RESERVED`로 바뀐 걸 감지해 409를 반환, 토스트 "구매할 수 없는 상품입니다" |
 
 ---
 
@@ -345,27 +345,36 @@ Access Token을 stateless로 두면 탈취 시 만료까지 막을 수 없다. �
 - `application.properties` — `spring.batch.jdbc.initialize-schema=always`(TCP PostgreSQL은 embedded로 인식 안 돼 기본값으론 메타 스키마가 안 생김), `spring.batch.job.enabled=false`
 
 **동작 근거(실제 관측)**
-`created_date`가 3일 전인 예약 주문이 정각 배치에서 취소되고 상품이 판매중으로 복귀했다.
+`findExpireReservedOrders`는 `created_date`가 아니라 **`last_modified_date`** 기준으로 만료를 판단한다
+(제안 수락으로 `RESERVED`가 된 시점 = 마지막 수정 시점). `last_modified_date`가 3일 전인 예약 주문이
+정각 배치에서 취소되고 상품이 판매중으로 복귀했다.
 
 ```text
 -- orders
- orders_id | order_status | created_date |     last_modified_date
------------+--------------+--------------+----------------------------
-         2 | CANCELED     | 2026-09-01   | 2026-09-04 20:00:00.248159   -- 정각에 자동 취소
+ orders_id | order_status |        last_modified_date
+-----------+--------------+-----------------------------
+        15 | CANCELED     | 2026-09-05 04:00:00.150301   -- 정각(분 단위 테스트 트리거)에 자동 취소
 
--- batch_job_execution  (매시 정각 실행)
- exec |         start_time         |          end_time          |  status
-------+----------------------------+----------------------------+-----------
-   16 | 2026-09-04 20:00:00.148919 | 2026-09-04 20:00:00.314345 | COMPLETED
-   15 | 2026-09-01 21:00:00.098447 | 2026-09-01 21:00:00.214905 | COMPLETED
+-- 취소 전/후 item 17 상태
+RESERVED → SELLING
 ```
 
 **화면 흐름**
 
-| 자동 취소로 판매중 복귀한 상품 |
-|---|
-| ![자동 복귀](./screenshots/07-batch/07-a-auto-released-item.jpg) |
-| 만료 예약이 취소되면서 상품이 다시 `판매중` — 즉시 구매/제안이 가능한 상태로 열림 |
+| | 배치 실행 전 | 배치 실행 후 |
+|---|---|---|
+| **상품 상세** | ![예약중](./screenshots/07-batch/07-a-item-detail-reserved-dimmed.jpg) | ![판매중 복귀](./screenshots/07-batch/07-b-item-detail-selling-restored.jpg) |
+| | `예약중` 배지 + "구매하기"/"가격 제안하기" 버튼이 딤드 처리되어 클릭 불가 | 배지가 다시 `판매중`으로, 버튼도 다시 활성화 |
+| **구매자 화면** | ![합의된 내역](./screenshots/07-batch/07-c-buyer-history-agreed-before.jpg) | ![취소 내역](./screenshots/07-batch/07-d-buyer-history-canceled-after.jpg) |
+| | 구매내역 "합의된 내역" 탭에 `승인됨` 뱃지 + 구매하기/취소 버튼 | "취소" 탭으로 옮겨가 `취소됨` 뱃지만 노출(액션 버튼 없음) |
+| **판매자 화면** | ![판매내역](./screenshots/07-batch/07-e-seller-history-approved-before.jpg) | ![판매내역 취소](./screenshots/07-batch/07-f-seller-history-canceled-after.jpg) |
+| | 판매내역에 `승인됨` 뱃지 + "구매자 결제 대기 중" | 같은 행이 `취소됨`으로 갱신 |
+
+> 구매자 쪽 "취소" 탭은 원래 프론트에 없었다(`PurchaseHistory.jsx`의 탭이 제안중/합의된 내역/구매완료
+> 3개뿐이라 `CANCELED` 주문이 어느 탭에도 노출되지 않는 사각지대였음) — 이 스크린샷을 위해 `TAB_STATUSES`에
+> `cancelled: ["CANCELED"]`와 탭 버튼을 추가했다. 상품 상세의 구매/제안 버튼 딤드 처리도 마찬가지로
+> `Detail.jsx`가 `item.status`와 무관하게 버튼을 항상 활성 상태로 두던 것을 이번에 고쳤다
+> (판매내역 쪽은 상태 필터가 없어 기존 코드 그대로도 `CANCELED`가 노출됨).
 
 ---
 

@@ -76,6 +76,7 @@ export default function Detail() {
   const isOwner = Boolean(member?.memberId) && member.memberId === item.memberId;
   const canMutate = isOwner && item.itemId;
   const canEdit = canMutate && item.status === "SELLING";
+  const canBuy = item.status === "SELLING";
 
   function moveSlide(step) {
     setActiveImageIndex((current) => (current + step + slideImages.length) % slideImages.length);
@@ -208,9 +209,9 @@ export default function Detail() {
             </div>
           ) : (
             <div className="buyer-actions">
-              <Button size="lg" onClick={handleBuy}>{member ? "구매하기" : "로그인하고 구매하기"}</Button>
+              <Button size="lg" onClick={handleBuy} disabled={loading || !canBuy}>{member ? "구매하기" : "로그인하고 구매하기"}</Button>
               <Button size="lg" variant="outline" onClick={handleInquire}>{member ? "문의하기" : "로그인하고 문의하기"}</Button>
-              <Button size="lg" variant="outline" onClick={handleProposePrice}>{member ? "가격 제안하기" : "로그인하고 가격 제안하기"}</Button>
+              <Button size="lg" variant="outline" onClick={handleProposePrice} disabled={loading || !canBuy}>{member ? "가격 제안하기" : "로그인하고 가격 제안하기"}</Button>
               <Button
                 size="lg"
                 variant={wished ? "secondary" : "ghost"}

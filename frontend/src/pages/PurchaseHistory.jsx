@@ -13,6 +13,7 @@ const TAB_STATUSES = {
   pending: ["REQUESTED"],
   agreed: ["RESERVED"],
   completed: ["PAY_COMPLETED", "SHIPPING", "COMPLETED"],
+  cancelled: ["CANCELED"],
 };
 
 export default function PurchaseHistory() {
@@ -20,7 +21,7 @@ export default function PurchaseHistory() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const tab = tabParam === "pending" || tabParam === "agreed" ? tabParam : "completed";
+  const tab = tabParam === "pending" || tabParam === "agreed" || tabParam === "cancelled" ? tabParam : "completed";
   const [orders, setOrders] = useState(null);
   const [page, setPage] = useState(0);
   const [hasNext, setHasNext] = useState(true);
@@ -125,7 +126,13 @@ export default function PurchaseHistory() {
   }
 
   const emptyMessage =
-    tab === "pending" ? "제안 중인 내역이 없습니다." : tab === "agreed" ? "합의된 내역이 없습니다." : "아직 구매한 상품이 없습니다.";
+    tab === "pending"
+      ? "제안 중인 내역이 없습니다."
+      : tab === "agreed"
+        ? "합의된 내역이 없습니다."
+        : tab === "cancelled"
+          ? "취소된 내역이 없습니다."
+          : "아직 구매한 상품이 없습니다.";
 
   return (
     <main className="page-shell narrow-page">
@@ -140,6 +147,7 @@ export default function PurchaseHistory() {
           <TabsTrigger value="completed" className="flex-1">구매완료</TabsTrigger>
           <TabsTrigger value="pending" className="flex-1">제안 중인 내역</TabsTrigger>
           <TabsTrigger value="agreed" className="flex-1">합의된 내역</TabsTrigger>
+          <TabsTrigger value="cancelled" className="flex-1">취소</TabsTrigger>
         </TabsList>
       </Tabs>
       {orders && orders.length === 0 && <p className="quiet-message">{emptyMessage}</p>}
@@ -169,7 +177,7 @@ export default function PurchaseHistory() {
                     <Button size="sm" variant="outline" disabled={loading} onClick={() => handleAction(order.orderId, "CANCEL", "주문을 취소했습니다.")}>취소</Button>
                   </>
                 )}
-                {order.orderStatus === "PAY_COMPLETED" && <span className="quiet-message">판매자 동의 대기 중</span>}
+                {order.orderStatus === "PAY_COMPLETED" && <span className="quiet-message">판매자 발송 대기 중</span>}
                 {order.orderStatus === "SHIPPING" && (
                   <Button size="sm" disabled={loading} onClick={() => handleAction(order.orderId, "CONFIRM", "구매를 확정했습니다.")}>구매확정</Button>
                 )}
